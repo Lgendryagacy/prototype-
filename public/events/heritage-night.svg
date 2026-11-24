@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="heritageWarm" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#780000" />
+      <stop offset="50%" stop-color="#c1121f" />
+      <stop offset="100%" stop-color="#660708" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="360" fill="url(#heritageWarm)" />
+  <!-- Ajrak / Truck Art inspired patterns -->
+  <circle cx="300" cy="180" r="120" fill="#fdf0d5" opacity="0.12" />
+  <rect x="70" y="60" width="460" height="240" rx="16" fill="#fdf0d5" filter="drop-shadow(0 15px 30px rgba(0,0,0,0.3))" />
+  <rect x="80" y="70" width="440" height="220" rx="12" fill="none" stroke="#780000" stroke-width="3" stroke-dasharray="10 5" />
+  <text x="300" y="115" font-family="'Cinzel', serif" font-weight="700" font-size="12" fill="#780000" text-anchor="middle" letter-spacing="4">CULTURAL CELEBRATION RAWALPINDI</text>
+  <text x="300" y="175" font-family="'Playfair Display', Georgia, serif" font-weight="900" font-size="38" fill="#660708" text-anchor="middle">Heritage Night</text>
+  <text x="300" y="225" font-family="'Inter', sans-serif" font-weight="800" font-size="18" fill="#c1121f" text-anchor="middle" letter-spacing="3">RANG, RAUNAQ, RAWAJ</text>
+  <text x="300" y="260" font-family="'Inter', sans-serif" font-weight="600" font-size="11" fill="#780000" text-anchor="middle">Traditional Food · Folk Music · Artisan Crafts</text>
+</svg>

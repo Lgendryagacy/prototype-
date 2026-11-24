@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%" fill="none">
+  <defs>
+    <!-- Soft Lavender Podium Floor -->
+    <radialGradient id="calPodiumGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.35" />
+      <stop offset="50%" stop-color="#A78BFA" stop-opacity="0.15" />
+      <stop offset="85%" stop-color="#C4B5FD" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#EDE9FE" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="calDisk" cx="50%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#FAF5FF" />
+      <stop offset="70%" stop-color="#F3E8FF" />
+      <stop offset="100%" stop-color="#E9D5FF" />
+    </radialGradient>
+
+    <!-- Purple Calendar Stand Gradients -->
+    <linearGradient id="calBodyGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#C084FC" />
+      <stop offset="35%" stop-color="#9333EA" />
+      <stop offset="75%" stop-color="#6B21A8" />
+      <stop offset="100%" stop-color="#4C1D95" />
+    </linearGradient>
+    <linearGradient id="spiralRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FAF5FF" />
+      <stop offset="40%" stop-color="#E9D5FF" />
+      <stop offset="75%" stop-color="#A855F7" />
+      <stop offset="100%" stop-color="#581C87" />
+    </linearGradient>
+
+    <!-- Vibrant Pink Megaphone Gradients -->
+    <linearGradient id="megaHornGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F472B6" />
+      <stop offset="40%" stop-color="#EC4899" />
+      <stop offset="80%" stop-color="#DB2777" />
+      <stop offset="100%" stop-color="#9D174D" />
+    </linearGradient>
+    <linearGradient id="megaRimGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FDF2F8" />
+      <stop offset="40%" stop-color="#F472B6" />
+      <stop offset="100%" stop-color="#BE185D" />
+    </linearGradient>
+
+    <!-- Yellow Star Thought Bubble -->
+    <linearGradient id="yellowBubble" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF08A" />
+      <stop offset="50%" stop-color="#FACC15" />
+      <stop offset="100%" stop-color="#CA8A04" />
+    </linearGradient>
+
+    <filter id="megaShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="14" flood-color="#831843" flood-opacity="0.35" />
+    </filter>
+    <filter id="calShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="15" flood-color="#581C87" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- 3D Soft Podium Floor Base -->
+  <ellipse cx="250" cy="440" rx="190" ry="46" fill="url(#calPodiumGrad)" />
+  <ellipse cx="250" cy="432" rx="150" ry="34" fill="url(#calDisk)" stroke="#E9D5FF" stroke-width="2" />
+
+  <!-- Colorful Confetti Bursts -->
+  <!-- Top Right Burst Lines -->
+  <path d="M 345 75 L 360 55" stroke="#9333EA" stroke-width="6.5" stroke-linecap="round" />
+  <path d="M 372 90 L 398 80" stroke="#7C3AED" stroke-width="6.5" stroke-linecap="round" />
+  <path d="M 380 115 L 406 118" stroke="#9333EA" stroke-width="6.5" stroke-linecap="round" />
+  <!-- Left Confetti Particles -->
+  <path d="M 100 235 L 85 245" stroke="#9333EA" stroke-width="5" stroke-linecap="round" />
+  <path d="M 75 270 L 60 275" stroke="#7C3AED" stroke-width="5" stroke-linecap="round" />
+  <circle cx="95" cy="210" r="4.5" fill="#F59E0B" />
+  <circle cx="120" cy="180" r="4" fill="#EC4899" />
+  <!-- Right Confetti Particles -->
+  <circle cx="410" cy="205" r="4.5" fill="#F59E0B" />
+  <circle cx="395" cy="230" r="4" fill="#EC4899" />
+
+  <!-- 3D DESK CALENDAR (REAR / MID) -->
+  <g filter="url(#calShadow)">
+    
+    <!-- Calendar Easel Stand / Backing (Perspective tilt) -->
+    <path d="M 160 140 L 360 140 L 380 370 L 140 370 Z" fill="url(#calBodyGrad)" stroke="#C084FC" stroke-width="2" />
+    
+    <!-- White Sheet Surface -->
+    <path d="M 165 170 L 355 170 L 372 360 L 148 360 Z" fill="#FFFFFF" />
+
+    <!-- 4 Spiral Rings on Top -->
+    <!-- Ring 1 -->
+    <ellipse cx="190" cy="135" rx="8" ry="24" fill="url(#spiralRing)" />
+    <!-- Ring 2 -->
+    <ellipse cx="240" cy="135" rx="8" ry="24" fill="url(#spiralRing)" />
+    <!-- Ring 3 -->
+    <ellipse cx="290" cy="135" rx="8" ry="24" fill="url(#spiralRing)" />
+    <!-- Ring 4 -->
+    <ellipse cx="340" cy="135" rx="8" ry="24" fill="url(#spiralRing)" />
+
+    <!-- Calendar Month Header Band -->
+    <path d="M 167 175 L 353 175 L 356 205 L 164 205 Z" fill="#FAF5FF" />
+
+    <!-- Day Grid Blocks (Rounded Squares) -->
+    <!-- Row 1 -->
+    <rect x="180" y="220" width="34" height="30" rx="8" fill="#EC4899" />
+    <rect x="230" y="220" width="34" height="30" rx="8" fill="#8B5CF6" />
+    <rect x="280" y="220" width="34" height="30" rx="8" fill="#A855F7" />
+    <!-- Row 2 -->
+    <rect x="175" y="265" width="34" height="30" rx="8" fill="#F43F5E" />
+    <rect x="225" y="265" width="34" height="30" rx="8" fill="#8B5CF6" />
+    <rect x="275" y="265" width="34" height="30" rx="8" fill="#7C3AED" />
+  </g>
+
+  <!-- YELLOW STAR THOUGHT BUBBLE (TOP RIGHT OF CALENDAR) -->
+  <g transform="translate(365, 120)" filter="drop-shadow(0 6px 10px rgba(0,0,0,0.18))">
+    <!-- Bubble Body -->
+    <rect x="0" y="0" width="55" height="50" rx="14" fill="url(#yellowBubble)" stroke="#FEF9C3" stroke-width="2" />
+    <polygon points="12,48 20,48 8,58" fill="#FACC15" />
+    <!-- White 5-pointed Star inside -->
+    <polygon points="27,10 31,21 42,21 33,28 36,39 27,32 18,39 21,28 12,21 23,21" fill="#FFFFFF" />
+  </g>
+
+  <!-- 3D VIBRANT PINK MEGAPHONE IN FOREGROUND -->
+  <g filter="url(#megaShadow)" transform="translate(230, 230)">
+    
+    <!-- Megaphone Cone/Horn (angled toward right) -->
+    <path d="M 30 110 L 125 55 C 138 90 138 150 125 185 L 30 130 Z" fill="url(#megaHornGrad)" stroke="#F472B6" stroke-width="2" />
+
+    <!-- Oval Front Mouth Rim of Horn -->
+    <ellipse cx="125" cy="120" rx="20" ry="65" fill="url(#megaRimGrad)" stroke="#FFFFFF" stroke-width="3" />
+    <ellipse cx="123" cy="120" rx="10" ry="45" fill="#831843" />
+
+    <!-- Rear Capsule / Handle Base -->
+    <rect x="5" y="98" width="30" height="44" rx="14" fill="#A855F7" stroke="#C084FC" stroke-width="2" />
+    
+    <!-- Grip Handle -->
+    <path d="M 45 130 L 60 190 C 62 196 68 200 76 198 C 84 196 88 188 85 182 L 70 125 Z" fill="#1E293B" />
+    <!-- Handle Ring Highlight -->
+    <rect x="55" y="160" width="22" height="6" rx="3" fill="#A855F7" />
+
+    <!-- Horn Top Reflection Highlight -->
+    <path d="M 38 114 L 115 68" stroke="#FCE7F3" stroke-width="4.5" stroke-linecap="round" opacity="0.8" />
+  </g>
+</svg>

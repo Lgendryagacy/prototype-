@@ -1,0 +1,120 @@
+
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" fill="none">
+    
+    <defs>
+      <!-- Ground Ambient Shadows -->
+      <radialGradient id="ambFloorShadow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#020617" stop-opacity="0.38" />
+        <stop offset="45%" stop-color="#090D1A" stop-opacity="0.18" />
+        <stop offset="75%" stop-color="#0F172A" stop-opacity="0.05" />
+        <stop offset="100%" stop-color="#0F172A" stop-opacity="0" />
+      </radialGradient>
+
+      <!-- Glass Highlight -->
+      <linearGradient id="glassGloss" x1="0%" y1="0%" x2="70%" y2="100%">
+        <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.65" />
+        <stop offset="35%" stop-color="#FFFFFF" stop-opacity="0.25" />
+        <stop offset="70%" stop-color="#FFFFFF" stop-opacity="0.05" />
+        <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+      </linearGradient>
+
+      <!-- Gold 3D Material -->
+      <linearGradient id="goldLight" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#FFFBEB" />
+        <stop offset="20%" stop-color="#FDE047" />
+        <stop offset="50%" stop-color="#EAB308" />
+        <stop offset="85%" stop-color="#CA8A04" />
+        <stop offset="100%" stop-color="#854D0E" />
+      </linearGradient>
+
+      <linearGradient id="goldEdge" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#713F12" />
+        <stop offset="40%" stop-color="#A16207" />
+        <stop offset="70%" stop-color="#EAB308" />
+        <stop offset="100%" stop-color="#FEF08A" />
+      </linearGradient>
+
+      <!-- Royal Blue 3D Material -->
+      <linearGradient id="blue3dGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+        <stop offset="0%" stop-color="#60A5FA" />
+        <stop offset="30%" stop-color="#2563EB" />
+        <stop offset="70%" stop-color="#1D4ED8" />
+        <stop offset="100%" stop-color="#0F2870" />
+      </linearGradient>
+
+      <!-- Deep Purple 3D Material -->
+      <linearGradient id="purple3dGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+        <stop offset="0%" stop-color="#C084FC" />
+        <stop offset="30%" stop-color="#8B5CF6" />
+        <stop offset="70%" stop-color="#6D28D9" />
+        <stop offset="100%" stop-color="#3B0764" />
+      </linearGradient>
+
+      <!-- Emerald 3D Material -->
+      <linearGradient id="emerald3dGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+        <stop offset="0%" stop-color="#6EE7B7" />
+        <stop offset="35%" stop-color="#10B981" />
+        <stop offset="75%" stop-color="#047857" />
+        <stop offset="100%" stop-color="#064E3B" />
+      </linearGradient>
+
+      <!-- Platinum / Chrome Material -->
+      <linearGradient id="chrome3d" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#FFFFFF" />
+        <stop offset="30%" stop-color="#E2E8F0" />
+        <stop offset="60%" stop-color="#94A3B8" />
+        <stop offset="85%" stop-color="#CBD5E1" />
+        <stop offset="100%" stop-color="#475569" />
+      </linearGradient>
+
+      <!-- Soft Drop Shadow Filter -->
+      <filter id="soft3dShadow" x="-20%" y="-20%" width="150%" height="150%">
+        <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#0F172A" flood-opacity="0.25" />
+        <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#0F172A" flood-opacity="0.15" />
+      </filter>
+
+      <!-- Glowing Filter for Accents -->
+      <filter id="glowGleam" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+  
+
+    <!-- Ground Shadow -->
+    <ellipse cx="256" cy="445" rx="180" ry="30" fill="url(#ambFloorShadow)" />
+
+    <!-- 3D Tiered Stage Podium -->
+    <g transform="translate(256, 320)" filter="url(#soft3dShadow)">
+      <!-- Tier 1 Base -->
+      <ellipse cx="0" cy="70" rx="170" ry="40" fill="#2E1065" />
+      <ellipse cx="0" cy="55" rx="160" ry="36" fill="url(#purple3dGrad)" stroke="#C084FC" stroke-width="3" />
+      
+      <!-- Tier 2 Middle -->
+      <ellipse cx="0" cy="35" rx="125" ry="28" fill="#4C1D95" />
+      <ellipse cx="0" cy="25" rx="120" ry="25" fill="url(#purple3dGrad)" stroke="#DDD6FE" stroke-width="2.5" />
+
+      <!-- Center Speaker Lectern -->
+      <polygon points="-35,25 35,25 25,-100 -25,-100" fill="url(#chrome3d)" stroke="#64748B" stroke-width="2" />
+      <!-- Lectern Top Slanted Reading Desk -->
+      <polygon points="-45,-100 45,-100 35,-125 -35,-125" fill="url(#purple3dGrad)" stroke="#DDD6FE" stroke-width="2" />
+    </g>
+
+    <!-- Floating 3D Megaphone / Broadcast Horn -->
+    <g transform="translate(256, 175) rotate(-15)" filter="url(#soft3dShadow)">
+      <!-- Horn Flare -->
+      <path d="M-60 -40 L50 -80 L50 80 L-60 40 Z" fill="url(#purple3dGrad)" stroke="#DDD6FE" stroke-width="3" />
+      <ellipse cx="50" cy="0" rx="20" ry="80" fill="url(#goldLight)" stroke="#FFFBEB" stroke-width="3" />
+      
+      <!-- Horn Base Cylinder -->
+      <rect x="-100" y="-35" width="45" height="70" rx="18" fill="url(#chrome3d)" stroke="#475569" stroke-width="2" />
+      
+      <!-- Handle -->
+      <path d="M-75 35 L-75 100 C-75 110 -65 115 -55 110 L-45 100" stroke="url(#chrome3d)" stroke-width="14" stroke-linecap="round" fill="none" />
+      
+      <!-- Soundwave Rings Emitting -->
+      <path d="M90 -50 C120 -20 120 20 90 50" stroke="#FDE047" stroke-width="6" stroke-linecap="round" fill="none" filter="url(#glowGleam)" />
+      <path d="M125 -75 C165 -30 165 30 125 75" stroke="#FDE047" stroke-width="6" stroke-linecap="round" fill="none" filter="url(#glowGleam)" />
+    </g>
+  </svg>
+  

@@ -1,0 +1,8 @@
+{
+  "name": "FOGSLY",
+  "description": "Pakistan's Career & Opportunity Platform for verified jobs, internships, professional events, and high-signal community networking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

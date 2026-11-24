@@ -1,0 +1,904 @@
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Briefcase, Tag, DollarSign, Type, User, AlertCircle, CheckCircle, X, Plus } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Label } from '../components/ui/Label';
+import { Textarea } from '../components/ui/Textarea';
+import { type Route } from '../types';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/Select';
+import { categories } from '../constants';
+import { auth } from '../firebase/config';
+import { getUserProfile } from '../firebase/services/userService';
+import { createJobRequest, getUserPendingJobRequestsCount } from '../firebase/services/jobRequestService';
+import { getFogCoinSettings } from '../firebase/services/fogCoinSettingsService';
+import { getUserEarnings, deductJobPayment, transferPlatformTax } from '../firebase/services/earningsService';
+import { UserProfile } from '../firebase/types/user';
+import { toast } from 'react-hot-toast';
+import { Badge } from '../components/ui/Badge';
+
+interface PostJobPageProps {
+  navigate: (route: Route, context?: any) => void;
+  isLoggedIn?: boolean;
+}
+
+const PostJobPage = ({ navigate, isLoggedIn = false }: PostJobPageProps) => {
+  const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [pendingJobsCount, setPendingJobsCount] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Platform tax constant
+  const PLATFORM_TAX_RATE = 0.025; // 2.5%
+  
+  // FOG Coin conversion
+  const [fogToPkrRate, setFogToPkrRate] = useState<number>(28.467); // Default rate
+  const [calculatedFogCoins, setCalculatedFogCoins] = useState<number>(0);
+  const [platformTaxAmount, setPlatformTaxAmount] = useState<number>(0);
+  const [totalAmountRequired, setTotalAmountRequired] = useState<number>(0);
+  const [userAvailableBalance, setUserAvailableBalance] = useState<number>(0);
+  const [hasInsufficientBalance, setHasInsufficientBalance] = useState<boolean>(false);
+  
+  // Profile completion
+  const [profileComplete, setProfileComplete] = useState(false);
+  const [profileCompletion, setProfileCompletion] = useState(0);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    jobTitle: '',
+    jobDescription: '',
+    categories: [] as string[],
+    skills: [] as string[],
+    budgetType: 'fixed' as 'hourly' | 'fixed' | 'quote',
+    budgetAmount: '',
+    budgetCurrency: 'PKR'
+  });
+
+  const [skillInput, setSkillInput] = useState('');
+  const [customCategory, setCustomCategory] = useState('');
+  const [showCustomCategory, setShowCustomCategory] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Fetch FOG Coin rates and auto-refresh every 30 seconds
+  useEffect(() => {
+    const fetchFogCoinRate = async () => {
+      try {
+        const settings = await getFogCoinSettings();
+        setFogToPkrRate(settings.fogToPkrRate);
+        console.log('📊 FOG Coin Rate Updated:', settings.fogToPkrRate, 'PKR per FOG');
+      } catch (error) {
+        console.error('Error fetching FOG coin rate:', error);
+        // Keep default rate if fetch fails
+      }
+    };
+
+    // Fetch immediately
+    fetchFogCoinRate();
+
+    // Set up auto-refresh every 30 seconds
+    const intervalId = setInterval(fetchFogCoinRate, 30000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Check authentication and load profile
+  useEffect(() => {
+    const checkAuthAndProfile = async () => {
+      if (!isLoggedIn || !auth.currentUser) {
+        toast.error('Please login to post a job');
+        navigate('auth');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // Fetch user profile
+        const profile = await getUserProfile(auth.currentUser.uid);
+        setUserProfile(profile);
+        
+        // Fetch user's available balance
+        const earnings = await getUserEarnings(auth.currentUser.uid);
+        if (earnings) {
+          setUserAvailableBalance(earnings.availableBalance);
+        }
+
+        // Check profile completion
+        const missing: string[] = [];
+        if (!profile?.name) missing.push('Name');
+        if (!profile?.city) missing.push('City');
+        if (!profile?.country) missing.push('Country');
+        if (!profile?.phone) missing.push('Phone Number');
+
+        setMissingFields(missing);
+        setProfileComplete(missing.length === 0);
+        
+        // Calculate completion percentage
+        const totalFields = 4;
+        const completedFields = totalFields - missing.length;
+        setProfileCompletion((completedFields / totalFields) * 100);
+
+        // Check pending jobs count
+        if (missing.length === 0) {
+          const pendingCount = await getUserPendingJobRequestsCount(auth.currentUser.uid);
+          setPendingJobsCount(pendingCount);
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        toast.error('Failed to load profile');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuthAndProfile();
+  }, [isLoggedIn, navigate]);
+
+  // Calculate FOG coins and platform tax when budget amount or rate changes
+  useEffect(() => {
+    if (formData.budgetType !== 'quote' && formData.budgetAmount && fogToPkrRate > 0) {
+      const budgetInPkr = parseFloat(formData.budgetAmount);
+      if (!isNaN(budgetInPkr) && budgetInPkr > 0) {
+        const fogCoins = budgetInPkr / fogToPkrRate;
+        const taxAmount = fogCoins * PLATFORM_TAX_RATE;
+        const totalRequired = fogCoins + taxAmount;
+        
+        setCalculatedFogCoins(fogCoins);
+        setPlatformTaxAmount(taxAmount);
+        setTotalAmountRequired(totalRequired);
+        
+        // Check if user has sufficient balance (budget + tax)
+        setHasInsufficientBalance(totalRequired > userAvailableBalance);
+      } else {
+        setCalculatedFogCoins(0);
+        setPlatformTaxAmount(0);
+        setTotalAmountRequired(0);
+        setHasInsufficientBalance(false);
+      }
+    } else {
+      setCalculatedFogCoins(0);
+      setPlatformTaxAmount(0);
+      setTotalAmountRequired(0);
+      setHasInsufficientBalance(false);
+    }
+  }, [formData.budgetAmount, formData.budgetType, fogToPkrRate, userAvailableBalance]);
+
+  // Add skill
+  const handleAddSkill = () => {
+    if (!skillInput.trim()) return;
+    
+    if (formData.skills.length >= 10) {
+      toast.error('Maximum 10 skills allowed');
+      return;
+    }
+
+    if (formData.skills.includes(skillInput.trim())) {
+      toast.error('Skill already added');
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      skills: [...prev.skills, skillInput.trim()]
+    }));
+    setSkillInput('');
+  };
+
+  // Remove skill
+  const handleRemoveSkill = (skill: string) => {
+    setFormData(prev => ({
+      ...prev,
+      skills: prev.skills.filter(s => s !== skill)
+    }));
+  };
+
+  // Add category
+  const handleAddCategory = (category: string) => {
+    if (formData.categories.length >= 3) {
+      toast.error('Maximum 3 categories allowed');
+      return;
+    }
+
+    if (formData.categories.includes(category)) {
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      categories: [...prev.categories, category]
+    }));
+  };
+
+  // Remove category
+  const handleRemoveCategory = (category: string) => {
+    setFormData(prev => ({
+      ...prev,
+      categories: prev.categories.filter(c => c !== category)
+    }));
+  };
+
+  // Add custom category
+  const handleAddCustomCategory = () => {
+    if (!customCategory.trim()) return;
+
+    if (formData.categories.length >= 3) {
+      toast.error('Maximum 3 categories allowed');
+      return;
+    }
+
+    if (formData.categories.includes(customCategory.trim())) {
+      toast.error('Category already added');
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      categories: [...prev.categories, customCategory.trim()]
+    }));
+    setCustomCategory('');
+    setShowCustomCategory(false);
+  };
+
+  // Validate form
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.jobTitle.trim()) {
+      newErrors.jobTitle = 'Job title is required';
+    }
+
+    if (!formData.jobDescription.trim()) {
+      newErrors.jobDescription = 'Job description is required';
+    }
+
+    if (formData.categories.length === 0) {
+      newErrors.categories = 'At least one category is required';
+    }
+
+    if (formData.skills.length === 0) {
+      newErrors.skills = 'At least one skill is required';
+    }
+
+    if (formData.budgetType !== 'quote' && !formData.budgetAmount.trim()) {
+      newErrors.budgetAmount = 'Budget amount is required';
+    }
+
+    if (formData.budgetType !== 'quote' && formData.budgetAmount && parseFloat(formData.budgetAmount) <= 0) {
+      newErrors.budgetAmount = 'Budget amount must be greater than 0';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Submit form
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+
+    if (!userProfile || !auth.currentUser) {
+      toast.error('User not authenticated')
+      return;
+    }
+    
+    // Check for insufficient balance
+    if (hasInsufficientBalance && formData.budgetType !== 'quote') {
+      const shortfall = totalAmountRequired - userAvailableBalance;
+      toast.error(
+        `Insufficient balance! You need ${totalAmountRequired.toFixed(2)} FOG (${calculatedFogCoins.toFixed(2)} budget + ${platformTaxAmount.toFixed(2)} platform fee). You're short by ${shortfall.toFixed(2)} FOG.`,
+        { duration: 6000 }
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Create job request first
+      const result = await createJobRequest({
+        userId: auth.currentUser.uid,
+        jobTitle: formData.jobTitle,
+        jobDescription: formData.jobDescription,
+        categories: formData.categories,
+        skills: formData.skills,
+        budgetType: formData.budgetType,
+        budgetAmount: formData.budgetType === 'quote' ? undefined : parseFloat(formData.budgetAmount),
+        budgetCurrency: formData.budgetCurrency,
+        budgetInFogCoins: formData.budgetType === 'quote' ? undefined : calculatedFogCoins,
+        userName: userProfile.name || userProfile.displayName || 'Unknown',
+        userEmail: userProfile.email || '',
+        userPhone: userProfile.phone || '',
+        userCity: userProfile.city || '',
+        userCountry: userProfile.country || ''
+      });
+
+      if (result.success && result.jobRequestId) {
+        // Deduct payment if not a quote request
+        if (formData.budgetType !== 'quote' && calculatedFogCoins > 0) {
+          // Deduct job budget
+          const paymentResult = await deductJobPayment(
+            auth.currentUser.uid,
+            calculatedFogCoins,
+            result.jobRequestId,
+            formData.jobTitle
+          );
+          
+          if (!paymentResult.success) {
+            toast.error(paymentResult.error || 'Payment failed. Please try again.');
+            return;
+          }
+          
+          // Transfer platform tax to admin
+          if (platformTaxAmount > 0) {
+            const taxResult = await transferPlatformTax(
+              platformTaxAmount,
+              result.jobRequestId,
+              formData.jobTitle,
+              'client',
+              auth.currentUser.uid
+            );
+            
+            if (!taxResult.success) {
+              console.error('Platform tax transfer failed:', taxResult.error);
+              toast.error('Job posted but platform fee processing failed. Contact support.');
+            }
+          }
+        }
+        
+        toast.success(
+          `Job posted successfully! ${calculatedFogCoins.toFixed(2)} FOG budget charged + ${platformTaxAmount.toFixed(2)} FOG platform fee. Awaiting admin approval.`,
+          { duration: 5000 }
+        );
+        navigate('job-requests-status');
+      } else {
+        toast.error(result.error || 'Failed to submit job request');
+      }
+    } catch (error) {
+      console.error('Error submitting job:', error);
+      toast.error('Failed to submit job request');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="bg-[--color-bg-secondary] min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[--color-primary] mx-auto mb-4"></div>
+          <p className="text-[--color-text-secondary]">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Profile incomplete state
+  if (!profileComplete) {
+    return (
+      <div className="bg-[--color-bg-secondary] min-h-screen">
+        <div className="container mx-auto px-4 py-8 pt-10">
+          <div className="max-w-2xl mx-auto">
+            <div className="mb-6">
+              <Button variant="ghost" onClick={() => navigate('find-work')}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Go back
+              </Button>
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-3 mb-4">
+                    <AlertCircle className="w-8 h-8 text-orange-500" />
+                    <CardTitle className="text-2xl">Complete Your Profile First</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Please complete your profile before posting a job. This information is required to process your job request.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Progress Bar */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-[--color-text-primary]">
+                        Profile Completion
+                      </span>
+                      <span className="text-sm font-bold text-[--color-primary]">
+                        {Math.round(profileCompletion)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                      <div
+                        className="bg-gradient-to-r from-orange-500 to-[--color-primary] h-3 rounded-full transition-all duration-500"
+                        style={{ width: `${profileCompletion}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Missing Fields */}
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3 text-[--color-text-primary]">
+                      Missing Information:
+                    </h3>
+                    <div className="space-y-2">
+                      {missingFields.map(field => (
+                        <div key={field} className="flex items-center gap-2 text-sm text-[--color-text-secondary]">
+                          <X className="w-4 h-4 text-red-500" />
+                          <span>{field}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Complete Profile Button */}
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    onClick={() => navigate('profile')}
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Complete Profile Now
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Max pending jobs reached
+  if (pendingJobsCount >= 2) {
+    return (
+      <div className="bg-[--color-bg-secondary] min-h-screen">
+        <div className="container mx-auto px-4 py-8 pt-10">
+          <div className="max-w-2xl mx-auto">
+            <div className="mb-6">
+              <Button variant="ghost" onClick={() => navigate('find-work')}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Go back
+              </Button>
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-3 mb-4">
+                    <AlertCircle className="w-8 h-8 text-orange-500" />
+                    <CardTitle className="text-2xl">Maximum Pending Jobs Reached</CardTitle>
+                  </div>
+                  <CardDescription>
+                    You have {pendingJobsCount} pending job requests. Please wait for admin approval before posting new jobs.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    onClick={() => navigate('job-requests-status')}
+                  >
+                    Check Request Status
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main form
+  return (
+    <div className="bg-[--color-bg-secondary] min-h-screen">
+      <div className="container mx-auto px-4 py-8 pt-10">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-6">
+            <Button variant="ghost" onClick={() => navigate('find-work')}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Go back
+            </Button>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <form onSubmit={handleSubmit}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-3xl">Post a New Job</CardTitle>
+                  <CardDescription>
+                    Fill out the details below to find the perfect talent for your project.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-8">
+                  {/* User Balance Display */}
+                  <div className="p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-[--color-text-secondary]">Your Available Balance</p>
+                        <p className="text-2xl font-bold text-[--color-primary]">
+                          {userAvailableBalance.toFixed(2)} FOG Coins
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => navigate('fog-coins')}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add FOG Coins
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Insufficient Balance Warning */}
+                  {hasInsufficientBalance && calculatedFogCoins > 0 && (
+                    <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-red-600 mb-1">Insufficient Balance</h4>
+                          <p className="text-sm text-red-500 mb-2">
+                            You need <strong>{calculatedFogCoins.toFixed(2)} FOG</strong> to post this job, 
+                            but you only have <strong>{userAvailableBalance.toFixed(2)} FOG</strong>.
+                          </p>
+                          <p className="text-sm text-red-500 mb-3">
+                            Please add <strong>{(calculatedFogCoins - userAvailableBalance).toFixed(2)} FOG</strong> more to proceed.
+                          </p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="default"
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={() => navigate('fog-coins')}
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Deposit FOG Coins
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Payment Info */}
+                  {formData.budgetType !== 'quote' && !hasInsufficientBalance && calculatedFogCoins > 0 && (
+                    <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-green-600 mb-1">Payment Ready</h4>
+                          <p className="text-sm text-green-600">
+                            <strong>{calculatedFogCoins.toFixed(2)} FOG Coins</strong> will be deducted from your balance when you submit this job.
+                            The amount will be refunded if the admin rejects your job request.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Section 1: Job Details */}
+                  <FormSection icon={Briefcase} title="Job Details">
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="job-title">Job Title *</Label>
+                        <Input
+                          id="job-title"
+                          placeholder="e.g., Senior UX Designer"
+                          value={formData.jobTitle}
+                          onChange={(e) => setFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
+                          className={errors.jobTitle ? 'border-red-500' : ''}
+                        />
+                        {errors.jobTitle && (
+                          <p className="text-xs text-red-500">{errors.jobTitle}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="job-description">Job Description *</Label>
+                        <Textarea
+                          id="job-description"
+                          placeholder="Describe the project, responsibilities, and qualifications..."
+                          rows={6}
+                          value={formData.jobDescription}
+                          onChange={(e) => setFormData(prev => ({ ...prev, jobDescription: e.target.value }))}
+                          className={errors.jobDescription ? 'border-red-500' : ''}
+                        />
+                        {errors.jobDescription && (
+                          <p className="text-xs text-red-500">{errors.jobDescription}</p>
+                        )}
+                      </div>
+                    </div>
+                  </FormSection>
+
+                  {/* Section 2: Categories */}
+                  <FormSection icon={Tag} title="Categories">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Select Categories (Max 3) *</Label>
+                        <Select onValueChange={(value) => {
+                          if (value === '__custom__') {
+                            setShowCustomCategory(true);
+                          } else {
+                            handleAddCategory(value);
+                          }
+                        }}>
+                          <SelectTrigger className={errors.categories ? 'border-red-500' : ''}>
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map(cat => (
+                              <SelectItem key={cat.name} value={cat.name}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="__custom__">
+                              + Add Custom Category
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {errors.categories && (
+                          <p className="text-xs text-red-500">{errors.categories}</p>
+                        )}
+                      </div>
+
+                      {/* Selected Categories */}
+                      {formData.categories.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {formData.categories.map(category => (
+                            <Badge
+                              key={category}
+                              variant="secondary"
+                              className="flex items-center gap-1 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900"
+                              onClick={() => handleRemoveCategory(category)}
+                            >
+                              {category}
+                              <X className="w-3 h-3" />
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Custom Category Input */}
+                      {showCustomCategory && (
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter custom category"
+                            value={customCategory}
+                            onChange={(e) => setCustomCategory(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCustomCategory())}
+                          />
+                          <Button type="button" onClick={handleAddCustomCategory}>Add</Button>
+                          <Button type="button" variant="outline" onClick={() => setShowCustomCategory(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </FormSection>
+
+                  {/* Section 3: Skills */}
+                  <FormSection icon={Tag} title="Required Skills">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Add Skills (1-10 required) *</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="e.g., Figma, React, Prototyping"
+                            value={skillInput}
+                            onChange={(e) => setSkillInput(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSkill())}
+                            className={errors.skills ? 'border-red-500' : ''}
+                          />
+                          <Button type="button" onClick={handleAddSkill}>
+                            Add
+                          </Button>
+                        </div>
+                        {errors.skills && (
+                          <p className="text-xs text-red-500">{errors.skills}</p>
+                        )}
+                        <p className="text-xs text-[--color-text-secondary]">
+                          Press Enter or click Add to add a skill ({formData.skills.length}/10)
+                        </p>
+                      </div>
+
+                      {/* Selected Skills */}
+                      {formData.skills.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {formData.skills.map(skill => (
+                            <Badge
+                              key={skill}
+                              variant="default"
+                              className="flex items-center gap-1 cursor-pointer hover:bg-red-500"
+                              onClick={() => handleRemoveSkill(skill)}
+                            >
+                              {skill}
+                              <X className="w-3 h-3" />
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </FormSection>
+
+                  {/* Section 4: Budget */}
+                  <FormSection icon={DollarSign} title="Budget">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="budget-type">Budget Type *</Label>
+                        <Select
+                          value={formData.budgetType}
+                          onValueChange={(value: any) => setFormData(prev => ({ ...prev, budgetType: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select budget type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="fixed">Fixed Price</SelectItem>
+                            <SelectItem value="hourly">Hourly Rate</SelectItem>
+                            {/* Hidden for now - will implement later */}
+                            {/* <SelectItem value="quote">Request a Quote</SelectItem> */}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {formData.budgetType !== 'quote' && (
+                        <div className="space-y-2">
+                          <Label htmlFor="budget-amount">
+                            Budget Amount ({formData.budgetCurrency}) *
+                          </Label>
+                          <Input
+                            id="budget-amount"
+                            type="number"
+                            placeholder="e.g., 5000"
+                            value={formData.budgetAmount}
+                            onChange={(e) => setFormData(prev => ({ ...prev, budgetAmount: e.target.value }))}
+                            className={errors.budgetAmount ? 'border-red-500' : ''}
+                          />
+                          {errors.budgetAmount && (
+                            <p className="text-xs text-red-500">{errors.budgetAmount}</p>
+                          )}
+                          
+                          {/* Platform Fee Notice */}
+                          <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                              <span className="font-semibold">Platform Fee:</span> A 2.5% service fee will be charged on your job budget to support platform operations and security.
+                            </p>
+                          </div>
+                          
+                          {/* FOG Coin Conversion Display */}
+                          {calculatedFogCoins > 0 && (
+                            <div className="mt-2 space-y-3">
+                              {/* Main conversion card */}
+                              <div className="p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-lg">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                      <span className="text-white font-bold text-xs">FC</span>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-[--color-text-secondary]">Job Budget in FOG Coins</p>
+                                      <p className="text-lg font-bold text-[--color-primary]">
+                                        {calculatedFogCoins.toFixed(2)} FOG
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xs text-[--color-text-secondary]">Conversion Rate</p>
+                                    <p className="text-sm font-medium text-[--color-text-primary]">
+                                      1 FOG = {fogToPkrRate.toFixed(2)} PKR
+                                    </p>
+                                  </div>
+                                </div>
+                                
+                                {/* Tax breakdown */}
+                                <div className="pt-3 border-t border-blue-500/20 space-y-2">
+                                  <div className="flex justify-between items-center text-sm">
+                                    <span className="text-[--color-text-secondary]">Platform Fee (2.5%)</span>
+                                    <span className="font-semibold text-orange-600 dark:text-orange-400">
+                                      +{platformTaxAmount.toFixed(2)} FOG
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-base font-bold pt-2 border-t border-blue-500/20">
+                                    <span className="text-[--color-text-primary]">Total Amount Required</span>
+                                    <span className="text-green-600 dark:text-green-400">
+                                      {totalAmountRequired.toFixed(2)} FOG
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-xs">
+                                    <span className="text-[--color-text-secondary]">Your Available Balance</span>
+                                    <span className={userAvailableBalance >= totalAmountRequired ? 'text-green-600' : 'text-red-600'}>
+                                      {userAvailableBalance.toFixed(2)} FOG
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Insufficient balance warning */}
+                              {hasInsufficientBalance && (
+                                <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                  <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <p className="text-sm font-semibold text-red-700 dark:text-red-300">Insufficient Balance</p>
+                                    <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                                      You need {(totalAmountRequired - userAvailableBalance).toFixed(2)} more FOG coins to post this job.
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {formData.budgetType === 'quote' && (
+                        <div className="flex items-center text-sm text-[--color-text-secondary] col-span-2">
+                          <AlertCircle className="w-4 h-4 mr-2" />
+                          You'll receive quotes from freelancers based on their assessment
+                        </div>
+                      )}
+                    </div>
+                  </FormSection>
+
+                  {/* Submit Buttons */}
+                  <div className="flex justify-end gap-4 pt-6 border-t border-[--color-border]">
+                    <Button
+                      type="submit"
+                      size="lg"
+                      disabled={isSubmitting || hasInsufficientBalance}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Submitting...
+                        </>
+                      ) : hasInsufficientBalance ? (
+                        'Insufficient Balance'
+                      ) : (
+                        'Post Job Request'
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </form>
+          </motion.div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FormSection = ({ icon: Icon, title, children }: { icon: React.ElementType, title: string, children: React.ReactNode }) => (
+    <div className="space-y-4">
+        <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-[--color-bg-secondary] flex items-center justify-center">
+                <Icon size={16} className="text-[--color-primary]" />
+            </div>
+            <h3 className="text-lg font-semibold">{title}</h3>
+        </div>
+        <div className="pl-11">{children}</div>
+    </div>
+);
+
+export default PostJobPage;

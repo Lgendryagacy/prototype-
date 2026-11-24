@@ -1,0 +1,91 @@
+import React, { useState } from 'react';
+import { type Route } from '../types';
+import FreelanceHero from '../components/FreelanceHero';
+import ActiveGigs from '@/components/ActiveGigs';
+// import LatestJobs from '../components/LatestJobs';
+import LatestJobs from '@/components/LatestJobs';
+import TrustAndSecurity from '../components/TrustAndSecurity';
+import CTA from '../components/CTA';
+import { useAuth } from '../firebase/hooks/useAuth';
+import { getUserFreelanceRequest } from '../firebase/services/freelanceRequests';
+
+const FindWorkPage = ({ navigate, isLoggedIn = false }: { navigate: (route: Route, context?: any) => void; isLoggedIn?: boolean }) => {
+    const { user: currentUser } = useAuth();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('');
+
+    const handleSearch = (query: string, category: string) => {
+        setSearchQuery(query);
+        setCategoryFilter(category);
+        
+        // Scroll to jobs section
+        const jobsSection = document.getElementById('jobs-section');
+        if (jobsSection) {
+            jobsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    // Check for pending request status
+    const checkPendingRequest = async () => {
+        if (!currentUser) return false;
+        try {
+            const request = await getUserFreelanceRequest(currentUser.uid);
+            return request?.requestStatus === 'pending';
+        } catch (error) {
+            console.error('Error checking request status:', error);
+            return false;
+        }
+    };
+
+    const [hasPendingRequest, setHasPendingRequest] = React.useState(false);
+
+    React.useEffect(() => {
+        if (currentUser) {
+            checkPendingRequest().then(setHasPendingRequest);
+        }
+    }, [currentUser]);
+    
+    return (
+        <div className="bg-[--color-bg-primary]">
+            
+            <FreelanceHero 
+                navigate={navigate} 
+                isLoggedIn={isLoggedIn}
+                onSearch={handleSearch}
+            />
+
+            <div className="container mx-auto px-4 py-8 space-y-10">
+                <ActiveGigs 
+                    navigate={navigate}
+                    searchQuery={searchQuery}
+                    categoryFilter={categoryFilter}
+                />
+                <div id="jobs-section">
+                    <LatestJobs 
+                        navigate={navigate}
+                        searchQuery={searchQuery}
+                        categoryFilter={categoryFilter}
+                    />
+                </div>
+            </div>
+            <TrustAndSecurity />
+            <CTA 
+                title="Start Today — Work Smarter with Fogsly Freelance."
+                description="Whether you're looking to hire top talent or find your next opportunity, Fogsly is where work gets done."
+                primaryButtonText="Hire Now"
+                secondaryButtonText={hasPendingRequest ? "Request Pending" : "Start Freelancing"}
+                onPrimaryClick={() => navigate('post-job')}
+                onSecondaryClick={() => {
+                    if (hasPendingRequest) {
+                        navigate('freelancer-request-status');
+                    } else {
+                        navigate('become-freelancer');
+                    }
+                }}
+                secondaryButtonDisabled={hasPendingRequest}
+            />
+        </div>
+    );
+};
+
+export default FindWorkPage;

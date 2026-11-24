@@ -1,0 +1,674 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Menu,
+  X,
+  User,
+  LayoutDashboard,
+  TrendingUp,
+  Calendar,
+  PlayCircle,
+  BadgeDollarSign,
+  LogOut,
+  LogIn,
+  Sparkles,
+  HeadphonesIcon,
+  Home,
+  UserCircle,
+  HelpCircle,
+  Settings,
+  Clipboard,
+  Package,
+  MessageCircle,
+  Loader2,
+  Gift,
+  ChevronDown,
+  Bookmark,
+  Briefcase
+} from 'lucide-react';
+import { type Theme, type Route } from '../types';
+import { Button } from './ui/Button';
+import { User as FirebaseUser } from '../firebase/types/user';
+import { getUserData } from '../firebase/services/userService';
+import { useScrollingNavigate } from '../utils/navigationUtils';
+import { useBrand } from '../firebase/hooks/useBrand';
+import { getUserEarnings } from '../firebase/services/userEarningsService';
+import { formatFog } from '../utils/fogCoinUtils';
+
+interface HeaderProps {
+  currentTheme: Theme;
+  setCurrentTheme: (theme: Theme) => void;
+  navigate: (route: Route, authMode?: 'login' | 'signup') => void; // Updated to support auth mode
+  isLoggedIn: boolean;
+  onLogout: () => void;
+  currentUser: FirebaseUser | null;
+  enableBottomMobileBar?: boolean;
+  currentRoute?: Route; // Add current route prop
+}
+
+
+
+// Bottom navigation items for mobile
+const bottomNavItems: { label: string; route: Route; icon: React.ReactNode; authRequired?: boolean; isMessagesButton?: boolean }[] = [
+  // { label: 'Events', route: 'events', icon: <Calendar className="w-5 h-5" /> },
+  { label: 'Watch Ads', route: 'watch-ads', icon: <PlayCircle className="w-5 h-5" /> },
+  // { label: 'Messages', route: 'messages', icon: <MessageCircle className="w-5 h-5" />, authRequired: true, isMessagesButton: true },
+  { label: 'FogCoins', route: 'fog-coins', icon: <HeadphonesIcon className="w-5 h-5" /> },
+  { label: 'Services', route: 'fog-services', icon: <Package className="w-5 h-5" /> },
+  { label: 'Profile', route: 'profile', icon: <UserCircle className="w-5 h-5" />, authRequired: true },
+  // { label: 'Support', route: 'customer-service', icon: <HelpCircle className="w-5 h-5" /> },
+];
+
+const themeSwatches: { value: Theme; label: string; colorClass: string }[] = [
+  { value: 'light', label: 'Light', colorClass: 'bg-gray-200' },
+  { value: 'dark', label: 'Dark', colorClass: 'bg-gray-700' },
+  { value: 'desert', label: 'Desert', colorClass: 'bg-orange-300' },
+];
+
+export const Header: React.FC<HeaderProps> = ({
+  currentTheme,
+  setCurrentTheme,
+  navigate,
+  isLoggedIn,
+  onLogout,
+  currentUser,
+  enableBottomMobileBar = true,
+  currentRoute = 'home',
+}) => {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [hasReferralCode, setHasReferralCode] = useState(false);
+  const [userBalance, setUserBalance] = useState<number>(0);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(true);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Use brand hook to check if user has a brand
+  const { brand, loading: brandLoading } = useBrand(currentUser?.uid);
+
+  const navLinks: { label: string; route: Route; icon: React.ReactNode }[] = [
+    // { label: 'Dashboard', route: 'dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+    // { label: 'Events', route: 'events', icon: <Calendar className="w-5 h-5" /> },
+    // { label: 'Watch Ads', route: 'watch-ads', icon: <PlayCircle className="w-5 h-5" /> },
+    // ...(isLoggedIn ? [{ label: 'Contracts', route: 'contracts' as Route, icon: <Clipboard className="w-5 h-5" /> }] : []),
+    // ...(isLoggedIn ? [{ label: 'Saved Jobs', route: 'saved-jobs' as Route, icon: <Bookmark className="w-5 h-5" /> }] : []),
+    // ...(isLoggedIn ? [{ label: 'My Applications', route: 'my-applications' as Route, icon: <Briefcase className="w-5 h-5" /> }] : []),
+    // { label: 'Fog Services', route: 'fog-services', icon: <Package className="w-5 h-5" /> },
+    { label: 'Buy Coin', route: 'fog-coins', icon: <HeadphonesIcon className="w-5 h-5" /> },
+    { label: 'Help & Payments', route: 'customer-service', icon: <HelpCircle className="w-5 h-5" /> },
+  ];
+  // Enhanced navigate function with scroll-to-top
+  const navigateWithScroll = useScrollingNavigate(navigate);
+
+  const handleScroll = useCallback(() => {
+    setIsScrolled(window.scrollY > 10);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (currentUser?.uid) {
+        try {
+          const userData = await getUserData(currentUser.uid);
+          setIsAdmin(userData?.role === 'admin');
+          // Check if user has referral code
+          setHasReferralCode(!!userData?.referralCode);
+        } catch (error) {
+          console.error('Error checking admin status:', error);
+          setIsAdmin(false);
+          setHasReferralCode(false);
+        }
+      } else {
+        setIsAdmin(false);
+        setHasReferralCode(false);
+      }
+    };
+    checkAdminStatus();
+  }, [currentUser]);
+
+  // Fetch user balance
+  useEffect(() => {
+    const fetchUserBalance = async () => {
+      if (!currentUser?.uid) {
+        setUserBalance(0);
+        setIsLoadingBalance(false);
+        return;
+      }
+
+      try {
+        setIsLoadingBalance(true);
+        const userEarnings = await getUserEarnings(currentUser.uid);
+        setUserBalance(userEarnings?.totalEarnings || 0);
+      } catch (error) {
+        console.error('Error fetching user balance:', error);
+        setUserBalance(0);
+      } finally {
+        setIsLoadingBalance(false);
+      }
+    };
+
+    fetchUserBalance();
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (mobileOpen) {
+      document.documentElement.classList.add('overflow-hidden', 'touch-none');
+    } else {
+      document.documentElement.classList.remove('overflow-hidden', 'touch-none');
+    }
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileOpen(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setShowProfileDropdown(false);
+      }
+    };
+
+    if (showProfileDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileDropdown]);
+
+  const toggleMobile = () => setMobileOpen(o => !o);
+
+  const handleNavClick = (route: Route) => {
+    if ((route === 'dashboard' || route === 'earnings-dashboard') && !isLoggedIn) {
+      navigateWithScroll('auth', 'login');
+    } else {
+      navigateWithScroll(route);
+    }
+    setMobileOpen(false);
+  };
+
+  const handleProfileClick = () => {
+    if (isAdmin) {
+      navigateWithScroll('admin-dashboard');
+    } else {
+      navigateWithScroll('profile');
+    }
+    setMobileOpen(false);
+  };
+
+  const handleBottomNavClick = (route: Route, authRequired?: boolean) => {
+    if (authRequired && !isLoggedIn) {
+      navigateWithScroll('auth'); // Using scroll navigation
+      // Note: For auth, we'll handle the mode separately if needed
+    } else if (route === 'profile') {
+      if (isAdmin) {
+        navigateWithScroll('admin-dashboard');
+      } else {
+        navigateWithScroll('profile');
+      }
+    } else if (route === 'messages') {
+      // Navigate to appropriate messages page based on brand ownership
+      handleMessagesClick();
+    } else {
+      navigateWithScroll(route);
+    }
+  };
+
+  const handleMessagesClick = () => {
+    if (!isLoggedIn) {
+      navigateWithScroll('auth', 'login');
+      return;
+    }
+
+    // If brand exists and is not frozen, navigate to brand-messages
+    if (brand && brand.status !== 'frozen') {
+      navigateWithScroll('brand-messages');
+    } else {
+      // Otherwise navigate to regular messages
+      navigateWithScroll('messages');
+    }
+  };
+
+  const ThemeSelector = () => (
+    <div className="flex items-center gap-2">
+      <div className="hidden md:flex items-center gap-1 px-2 py-1 rounded-full bg-[--color-bg-secondary]/70 backdrop-blur-sm">
+        {themeSwatches.map(ts => (
+          <motion.button
+            key={ts.value}
+            onClick={() => setCurrentTheme(ts.value)}
+            className={`w-4 h-4 md:w-6 md:h-6 rounded-full transition-all border border-transparent ${currentTheme === ts.value
+              ? 'ring-2 ring-[--color-primary] ring-offset-2 ring-offset-[--color-bg-secondary]'
+              : 'hover:ring-2 hover:ring-[--color-primary]/50'
+              } ${ts.colorClass}`}
+            aria-label={`${ts.label} theme`}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+          />
+        ))}
+      </div>
+      <motion.button
+        onClick={() => {
+          const order: Theme[] = ['light', 'dark', 'desert'];
+          const idx = order.indexOf(currentTheme);
+          const next = order[(idx + 1) % order.length];
+          setCurrentTheme(next);
+        }}
+        whileTap={{ scale: 0.9 }}
+        className="md:hidden relative inline-flex items-center justify-center w-9 h-9 rounded-full bg-[--color-bg-secondary]/70 backdrop-blur-sm border border-white/10 hover:border-[--color-primary]/50 transition"
+        aria-label="Cycle theme"
+      >
+        <Sparkles className="w-5 h-5 text-[--color-primary]" />
+        <span className="sr-only">Change theme</span>
+      </motion.button>
+    </div>
+  );
+
+  return (
+    <>
+      <style jsx>{`
+        @supports (height: 100dvh) {
+          .mobile-sidebar {
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+          }
+        }
+        @supports not (height: 100dvh) {
+          .mobile-sidebar {
+            height: 100vh !important;
+            max-height: 100vh !important;
+          }
+        }
+        /* Fix for iOS Safari */
+        @media screen and (max-width: 768px) {
+          .mobile-sidebar {
+            height: 100vh !important;
+            height: calc(var(--vh, 1vh) * 100) !important;
+          }
+        }
+      `}</style>
+      <header
+        className={[
+          'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
+          isScrolled
+            ? 'bg-[--color-bg-primary]/70 backdrop-blur-md shadow-[0_2px_8px_-2px_rgba(0,0,0,0.15)] border-b border-white/5'
+            : 'bg-transparent',
+        ].join(' ')}
+        role="banner"
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-6 lg:px-10 h-16 flex items-center justify-between gap-4">
+          <motion.button
+            onClick={() => {
+              navigateWithScroll('home');
+              setMobileOpen(false);
+            }}
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center gap-2 group focus:outline-none"
+          >
+            <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-[--color-primary] to-[--color-accent] bg-clip-text text-transparent">
+              FOGSLY
+            </span>
+          </motion.button>
+
+          <nav className="hidden md:flex items-center gap-8" aria-label="Primary">
+            {navLinks.map(link => (
+              <motion.button
+                key={link.label}
+                onClick={() => handleNavClick(link.route)}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                className="relative text-sm font-medium text-[--color-text-primary]/80 hover:text-[--color-primary] transition-colors"
+              >
+                {link.label}
+              </motion.button>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-1 md:gap-3">
+            <Button
+              size="sm"
+              className="hidden md:block bg-[--color-badge-herobg] text-[--color-badge-text] rounded-[34px] md:text-md px-0 font-bold"
+            >
+              {isLoadingBalance ? 'Loading...' : `Wallet: ${formatFog(userBalance)}`}
+            </Button>
+            <ThemeSelector />
+            <div className="hidden md:flex items-center gap-2">
+              {isLoggedIn ? (
+                <>
+                  {/* Messages Icon with Loader */}
+                  <motion.button
+                    onClick={handleMessagesClick}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.92 }}
+                    className="w-9 h-9 rounded-full flex items-center justify-center bg-[--color-bg-secondary]/70 border border-white/10 relative"
+                    disabled={brandLoading}
+                    title={brandLoading ? 'Loading...' : 'Messages'}
+                  >
+                    {brandLoading ? (
+                      <Loader2 className="w-5 h-5 text-[--color-text-primary] animate-spin" />
+                    ) : (
+                      <MessageCircle className="w-5 h-5 text-[--color-text-primary]" />
+                    )}
+                  </motion.button>
+
+                  {/* Profile Button - Show dropdown only if user has referral code */}
+                  {hasReferralCode ? (
+                    <>
+                      <div className="relative" ref={profileDropdownRef}>
+                        <motion.button
+                          onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[--color-bg-secondary]/70 border border-white/10 hover:border-[--color-primary]/50 transition-colors"
+                        >
+                          <User className="w-4 h-4 text-[--color-text-primary]" />
+                          <ChevronDown className={`w-3 h-3 text-[--color-text-primary] transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} />
+                        </motion.button>
+
+                        <AnimatePresence>
+                          {showProfileDropdown && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50"
+                            >
+                              <button
+                                onClick={() => {
+                                  handleProfileClick();
+                                  setShowProfileDropdown(false);
+                                }}
+                                className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                              >
+                                {isAdmin ? (
+                                  <>
+                                    <LayoutDashboard className="w-4 h-4 text-[--color-primary]" />
+                                    <span className="text-sm font-medium text-gray-900 dark:text-white">Admin Dashboard</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserCircle className="w-4 h-4 text-[--color-primary]" />
+                                    <span className="text-sm font-medium text-gray-900 dark:text-white">My Profile</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  navigateWithScroll('referrals');
+                                  setShowProfileDropdown(false);
+                                }}
+                                className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border-t border-gray-200 dark:border-gray-700"
+                              >
+                                <Gift className="w-4 h-4 text-[--color-primary]" />
+                                <span className="text-sm font-medium text-gray-900 dark:text-white">Refer a Friend</span>
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                      <Button variant="ghost" onClick={onLogout}>
+                        <LogOut className="w-4 h-4" /> Log Out
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <motion.button
+                        onClick={handleProfileClick}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.92 }}
+                        className="w-9 h-9 rounded-full flex items-center justify-center bg-[--color-bg-secondary]/70 border border-white/10"
+                      >
+                        <User className="w-5 h-5 text-[--color-text-primary]" />
+                      </motion.button>
+                      <Button variant="ghost" onClick={onLogout}>
+                        <LogOut className="w-4 h-4" /> Log Out
+                      </Button>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Button variant="ghost" onClick={() => navigateWithScroll('auth', 'login')}>
+                    <LogIn className="w-4 h-4" /> Log In
+                  </Button>
+                  <Button onClick={() => navigateWithScroll('auth', 'signup')}>
+                    <span>Sign Up</span>
+                  </Button>
+                </>
+              )}
+            </div>
+            <div className="flex md:hidden items-center gap-1">
+              {!isLoggedIn ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs pr-0 px-1 py-1.5 h-8 "
+                  >
+                    <LogIn className="w-3 h-3" />
+                    <div className="seperate flex gap-1">
+                      <span className="ml-1"
+                        onClick={() => navigateWithScroll('auth', 'login')}
+                      >Login</span> / <span onClick={() => navigateWithScroll('auth', 'signup')}> Sign Up</span>
+                    </div>
+
+                  </Button>
+                </>
+
+              ) : (
+                <>
+                  {/* Messages Icon for Mobile - Next to Profile */}
+                  <motion.button
+                    onClick={handleMessagesClick}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.92 }}
+                    className="w-9 h-9 rounded-full flex items-center justify-center bg-[--color-bg-secondary]/70 border border-white/10"
+                    disabled={brandLoading}
+                    title={brandLoading ? 'Loading...' : 'Messages'}
+                  >
+                    {brandLoading ? (
+                      <Loader2 className="w-4 h-4 text-[--color-text-primary] animate-spin" />
+                    ) : (
+                      <MessageCircle className="w-4 h-4 text-[--color-text-primary]" />
+                    )}
+                  </motion.button>
+                  <motion.button
+                    onClick={handleProfileClick}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.92 }}
+                    className="w-9 h-9 rounded-full flex items-center justify-center bg-[--color-bg-secondary]/70 border border-white/10"
+                  >
+                    <User className="w-5 h-5 text-[--color-text-primary]" />
+                  </motion.button>
+                </>
+              )}
+              <motion.button
+                onClick={toggleMobile}
+                aria-expanded={mobileOpen}
+                aria-label="Toggle menu"
+                whileTap={{ scale: 0.9 }}
+                className="w-10 h-10 rounded-xl flex items-center justify-center border border-white/10 bg-[--color-bg-secondary]"
+              >
+                {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </motion.button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Sidebar */}
+        <AnimatePresence>
+          {mobileOpen && (
+            <>
+              <motion.div
+                key="backdrop"
+                className="fixed inset-0 z-40 bg-black/50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setMobileOpen(false)}
+              />
+              <motion.div
+                key="panel"
+                className="mobile-sidebar fixed top-0 right-0 bottom-0 z-50 w-[80%] max-w-sm bg-[--color-bg-primary] border-l border-[--color-border] flex flex-col overflow-hidden"
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+              >
+                <div className="h-16 flex items-center justify-between px-5 border-b border-[--color-border] flex-shrink-0">
+                  <button
+                    onClick={() => {
+                      navigateWithScroll('home');
+                      setMobileOpen(false);
+                    }}
+                    className="text-lg font-bold bg-gradient-to-r from-[--color-primary] to-[--color-accent] bg-clip-text text-transparent"
+                  >
+                    FOGSLY
+                  </button>
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setMobileOpen(false)}
+                    className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-white/5"
+                  >
+                    <X className="w-5 h-5" />
+                  </motion.button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-5 py-6 space-y-6 min-h-0">
+                  <ul className="space-y-2">
+                    {navLinks.map(link => (
+                      <li key={link.label}>
+                        <motion.button
+                          onClick={() => handleNavClick(link.route)}
+                          whileTap={{ scale: 0.97 }}
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left hover:bg-white/[0.06] text-[--color-text-primary]"
+                        >
+                          {link.icon}
+                          {link.label}
+                        </motion.button>
+                      </li>
+                    ))}
+
+                    <li><motion.button
+                      onClick={() => handleNavClick('referrals')}
+                      whileTap={{ scale: 0.97 }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left hover:bg-white/[0.06] text-[--color-text-primary]"
+                    >
+
+                      <Gift className="w-5 h-5" />
+                      <span className="text-[--color-text-primary]">Refer a Friend</span>
+                    </motion.button></li>
+                  </ul>
+                </div>
+
+                {/* Auth Buttons inside Sidebar - Always visible at bottom */}
+                <div className="flex-shrink-0 p-5 border-t border-[--color-border] space-y-3 bg-[--color-bg-primary]"
+                  style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }} // Account for safe area
+                >
+                  {isLoggedIn ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        className="w-full flex items-center justify-center gap-2"
+                        onClick={onLogout}
+                      >
+                        <LogOut className="w-4 h-4" /> Sign Out
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full flex items-center justify-center gap-2"
+                        onClick={handleProfileClick}
+                      >
+                        <User className="w-4 h-4" /> Profile
+                      </Button>
+
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        className="w-full flex items-center justify-center gap-2"
+                        onClick={() => {
+                          navigateWithScroll('auth', 'login');
+                          setMobileOpen(false);
+                        }}
+                      >
+                        <LogIn className="w-4 h-4" /> Log In
+                      </Button>
+                      <Button
+                        className="w-full"
+                        onClick={() => {
+                          navigateWithScroll('auth', 'signup');
+                          setMobileOpen(false);
+                        }}
+                      >
+                        Sign Up
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      </header>
+      <div className="h-16" />
+
+      {/* Mobile Bottom Navigation */}
+      {enableBottomMobileBar && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40">
+          <div className="bg-[--color-bg-primary]/95 backdrop-blur-md border-t border-[--color-border] px-2 py-1"
+            style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
+            <div className="flex items-center justify-around">
+              {bottomNavItems.map((item) => {
+                const isActive = currentRoute === item.route ||
+                  (item.isMessagesButton && (currentRoute === 'messages' || currentRoute === 'brand-messages'));
+
+                return (
+                  <motion.button
+                    key={item.route}
+                    onClick={() => handleBottomNavClick(item.route, item.authRequired)}
+                    whileTap={{ scale: 0.9 }}
+                    disabled={item.isMessagesButton && brandLoading}
+                    className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px] ${isActive
+                      ? 'text-[--color-primary] bg-[--color-primary]/10'
+                      : 'text-[--color-text-secondary] hover:text-[--color-primary] hover:bg-[--color-bg-secondary]/50'
+                      } ${item.isMessagesButton && brandLoading ? 'opacity-50' : ''}`}
+                  >
+                    <div className={`transition-transform ${isActive ? 'scale-110' : ''}`}>
+                      <div className={`w-5 h-5 ${isActive ? 'text-[--color-primary]' : ''}`}>
+                        {item.isMessagesButton && brandLoading ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          item.icon
+                        )}
+                      </div>
+                    </div>
+                    <span className={`text-xs font-medium ${isActive ? 'text-[--color-primary]' : ''}`}>
+                      {item.label}
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default Header;

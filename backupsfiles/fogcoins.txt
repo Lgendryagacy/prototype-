@@ -1,0 +1,180 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { CheckCircle, ArrowRightLeft } from 'lucide-react';
+import { Button } from './ui/Button';
+import { type Route } from '../types';
+import { useScrollingNavigate } from '@/utils/navigationUtils';
+const FogCoins = ({ navigate }: { navigate: (route: Route) => void }) => {
+  const navigateWithScroll = useScrollingNavigate(navigate);
+  const features = [
+    "Zero transaction fees for FOG Coin payments",
+    "Instant global transfers with blockchain technology",
+    "Earn rewards through our loyalty program",
+    "Exclusive discounts on premium services"
+  ];
+
+  return (
+    <div className="py-8 px-4 md:p-12 bg-[--color-bg-secondary]">
+      <div className="text-center mb-12">
+        <motion.h1
+          {...{
+            initial: { opacity: 0, y: -20 },
+            whileInView: { opacity: 1, y: 0 },
+            viewport: { once: true },
+            transition: { duration: 0.5 },
+          }}
+          className="text-4xl md:text-5xl font-bold text-[--color-text-primary]"
+        >
+          FOG Coins
+        </motion.h1>
+        <motion.p
+          {...{
+            initial: { opacity: 0, y: -20 },
+            whileInView: { opacity: 1, y: 0 },
+            viewport: { once: true },
+            transition: { duration: 0.5, delay: 0.1 },
+          }}
+          className="mt-4 text-lg text-[--color-text-secondary] max-w-2xl mx-auto"
+        >
+          Our native cryptocurrency for seamless transactions on the platform
+        </motion.p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-12 items-center">
+        {/* Left Side */}
+        <motion.div
+          className="lg:col-span-3"
+          {...{
+            initial: { opacity: 0, x: -30 },
+            whileInView: { opacity: 1, x: 0 },
+            viewport: { once: true },
+            transition: { duration: 0.6, delay: 0.2 },
+          }}
+        >
+          <h2 className="text-2xl font-bold mb-4 text-[--color-text-primary]">What are FOG Coins?</h2>
+          <p className="text-[--color-text-secondary] mb-6">
+            FOG Coins are our platform's native digital currency designed to make transactions faster, cheaper, and more secure. Use them to pay for services, boost your profile, or access premium features.
+          </p>
+          <ul className="space-y-4 mb-8">
+            {features.map((feature, index) => (
+              <li key={index} className="flex items-start">
+                <CheckCircle className="w-5 h-5 text-green-500 mr-3 mt-1 flex-shrink-0" />
+                <span className="text-[--color-text-secondary]">{feature}</span>
+              </li>
+            ))}
+          </ul>
+          <Button
+            size="lg"
+            className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold shadow-lg hover:shadow-yellow-500/30 transition-shadow"
+            onClick={() => navigateWithScroll('fog-coins')}
+          >
+            Get Started with FOG Coins
+          </Button>
+        </motion.div>
+
+        {/* Right Side - Wallet Card */}
+        <motion.div
+          className="lg:col-span-3"
+          {...{
+            initial: { opacity: 0, scale: 0.9 },
+            whileInView: { opacity: 1, scale: 1 },
+            viewport: { once: true },
+            transition: { duration: 0.6, delay: 0.3 },
+          }}
+        >
+          <div className="bg-gradient-to-br from-[--color-card] to-[--color-bg-secondary] rounded-3xl shadow-xl py-6 px-3 md:p-8 border border-[--color-border] relative overflow-hidden">
+            {/* Subtle Background Pattern */}
+            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-[--color-primary]/5 to-transparent rounded-full -mr-20 -mt-20"></div>
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-[--color-accent]/5 to-transparent rounded-full -ml-16 -mb-16"></div>
+
+            <div className="relative z-10">
+              {/* Header Section */}
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-[--color-primary] rounded-xl flex items-center justify-center shadow-lg">
+                    <span className="text-white font-bold text-lg">₣</span>
+                  </div>
+                  <div>
+                    <div className="bg-[--color-primary]/10 text-[--color-primary] text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide">
+                      Live Rate
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs text-[--color-text-secondary]">Updated just now</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rate Display */}
+              <div className="text-center mb-6">
+                <div className="text-2xl md:text-3xl font-bold text-[--color-text-primary] mb-2">
+                  <span className="text-[--color-text-secondary]">1 FOG =</span>
+                  <span className="text-[--color-primary] ml-2">$0.10</span>
+                </div>
+                <div className="w-16 h-0.5 bg-[--color-primary] rounded-full mx-auto"></div>
+              </div>
+
+              {/* Balance Card */}
+              <div className="bg-[--color-bg-primary]/80 backdrop-blur-sm rounded-2xl p-2 md:p-5 mb-5 border border-[--color-border] shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-[--color-text-secondary] to-[--color-text-primary] rounded-lg flex items-center justify-center">
+                      <span className="text-[--color-bg-primary] font-bold text-sm">₣</span>
+                    </div>
+                    <div>
+                      <div className="text-[--color-text-secondary] text-sm font-medium mb-1">
+                        Your Balance
+                      </div>
+                      <div className="text-[--color-text-secondary]/70 text-xs font-mono">
+                        Wallet •••6738
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-1xl md:text-2xl font-bold text-[--color-text-primary]">
+                      0
+                    </div>
+                    <div className="text-xs md:text-sm text-[--color-text-secondary] font-medium">
+                      FOG COINS
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance Section */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="text-xs md:text-sm text-[--color-text-secondary] font-medium">
+                  24h Performance
+                </div>
+                <div className="flex gap-2">
+                  <div className="bg-green-500 text-white px-2 md:px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold shadow-md">
+                    +2.5%
+                  </div>
+                  <div className="bg-green-500 text-white px-2 md:px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold shadow-md">
+                    +$31.25
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <motion.button
+                  className="flex-1 bg-[--color-primary] hover:opacity-90 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all duration-200 text-sm"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigateWithScroll('fog-coins')}
+
+                >
+                  Buy FOG Coins
+                </motion.button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+export default FogCoins;

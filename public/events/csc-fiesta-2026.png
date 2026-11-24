@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="parchment" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff8e7" />
+      <stop offset="100%" stop-color="#f5e6c8" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="360" fill="url(#parchment)" />
+  <!-- Doodles and festive confetti -->
+  <circle cx="80" cy="90" r="18" fill="#ffd166" opacity="0.6" />
+  <circle cx="520" cy="80" r="22" fill="#ef476f" opacity="0.5" />
+  <circle cx="120" cy="270" r="14" fill="#06d6a0" opacity="0.6" />
+  <circle cx="480" cy="290" r="20" fill="#118ab2" opacity="0.5" />
+  <path d="M 60,180 Q 90,140 120,180" stroke="#f77f00" stroke-width="4" fill="none" stroke-linecap="round" />
+  <path d="M 480,180 Q 510,220 540,180" stroke="#06d6a0" stroke-width="4" fill="none" stroke-linecap="round" />
+  <!-- Musical notes -->
+  <text x="140" y="110" font-size="28" fill="#e76f51" opacity="0.8">♪</text>
+  <text x="450" y="120" font-size="32" fill="#2a9d8f" opacity="0.8">♫</text>
+  <!-- Card text -->
+  <rect x="130" y="70" width="340" height="220" rx="20" fill="#ffffff" stroke="#e9c46a" stroke-width="3" filter="drop-shadow(0 10px 20px rgba(180,140,80,0.15))" />
+  <text x="300" y="145" font-family="'Fredoka', 'Montserrat', sans-serif" font-weight="900" font-size="44" fill="#264653" text-anchor="middle">CSC</text>
+  <text x="300" y="210" font-family="'Brush Script MT', 'Pacifico', cursive, sans-serif" font-size="62" fill="#e76f51" text-anchor="middle">Fiesta</text>
+  <text x="300" y="255" font-family="'Inter', sans-serif" font-weight="800" font-size="16" fill="#2a9d8f" text-anchor="middle" letter-spacing="4">2026 EDITION</text>
+</svg>

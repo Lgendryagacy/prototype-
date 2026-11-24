@@ -1,0 +1,780 @@
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { type Route } from '../types';
+import { Input } from '../components/ui/Input';
+import { Search, ShoppingBag, Loader2, ChevronLeft, ChevronRight, Star, Package, ArrowLeft } from 'lucide-react';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
+import { useBrand } from '../firebase/hooks/useBrand';
+import { useApprovedBrands } from '../firebase/hooks/useApprovedBrands';
+import ApprovedBrandCard from '../components/ApprovedBrandCard';
+import { User } from '../firebase/types/user';
+import { collection, query, where, orderBy, getDocs, limit, doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { BrandService } from '../firebase/types/service';
+
+interface FogServicesPageProps {
+    navigate: (route: Route, context?: any, options?: { name?: string }) => void;
+    user?: User | null;
+    isLoggedIn?: boolean;
+}
+
+type ViewMode = 'brands' | 'services';
+const ITEMS_PER_PAGE = 12;
+const MAX_VISIBLE_CATEGORIES = 5;
+
+const FogServicesPage = ({ navigate, user, isLoggedIn }: FogServicesPageProps) => {
+    const [viewMode, setViewMode] = useState<ViewMode>('services');
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [categoryScrollPosition, setCategoryScrollPosition] = useState(0);
+    const categoryContainerRef = useRef<HTMLDivElement>(null);
+
+    // Brand-related states
+    const { brandRequest, brand, getBrandStatus, canCreateBrand, loading: brandLoading } = useBrand(user?.uid);
+    const { brands: approvedBrands, categories: brandCategories, loading: brandsLoading, error: brandsError, getBrandsByCategory } = useApprovedBrands();
+
+    // Service-related states
+    const [services, setServices] = useState<BrandService[]>([]);
+    const [servicesLoading, setServicesLoading] = useState(false);
+    const [servicesError, setServicesError] = useState<string | null>(null);
+    const [serviceCategories, setServiceCategories] = useState<string[]>(['All']);
+
+    // Fetch all services
+    useEffect(() => {
+        const fetchServices = async () => {
+            try {
+                setServicesLoading(true);
+                setServicesError(null);
+
+                // Query to get all non-frozen services
+                const q = query(
+                    collection(db, 'BrandsServices'),
+                    where('status', '!=', 'frozen'),
+                    orderBy('status'),
+                    orderBy('createdAt', 'desc'),
+                    limit(1000) // Fetch up to 1000 services for client-side filtering
+                );
+
+                const querySnapshot = await getDocs(q);
+
+
+
+                const fetchedServices: BrandService[] = querySnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        title: data.title,
+                        description: data.description,
+                        categories: data.categories || [],
+                        mainImage: data.mainImage,
+                        thumbnailImages: data.thumbnailImages || [],
+                        pricing: data.pricing,
+                        faqs: data.faqs || [],
+                        brandId: data.brandId,
+                        brandName: data.brandName,
+                        brandTagline: data.brandTagline,
+                        brandLogo: data.brandLogo,
+                        brandDescription: data.brandDescription,
+                        userId: data.userId,
+                        status: data.status,
+                        soldOut: data.soldOut || false,
+                        createdAt: data.createdAt.toDate(),
+                        updatedAt: data.updatedAt.toDate(),
+                        stats: data.stats || {
+                            views: 0,
+                            orders: 0,
+                            rating: 0,
+                            reviews: 0
+                        }
+                    };
+                });
+
+
+                // Filter out services whose brands are frozen
+                // Get unique brand IDs
+                const brandIds = [...new Set(fetchedServices.map(s => s.brandId))];
+
+                // Fetch brand statuses
+                const brandStatusMap = new Map<string, string>();
+                await Promise.all(
+                    brandIds.map(async (brandId) => {
+                        try {
+                            const brandDoc = await getDoc(doc(db, 'brands', brandId));
+                            if (brandDoc.exists()) {
+                                brandStatusMap.set(brandId, brandDoc.data().status || 'active');
+                            }
+                        } catch (error) {
+                            console.error(`Error fetching brand ${brandId}:`, error);
+                        }
+                    })
+                );
+
+                // Filter services - only show if brand is not frozen AND service is not sold out
+                const activeServices = fetchedServices.filter(service => {
+                    const brandStatus = brandStatusMap.get(service.brandId);
+                    return brandStatus !== 'frozen' && !service.soldOut;
+                });
+
+                setServices(activeServices);
+
+                // Extract unique categories from active services
+                const categoriesSet = new Set<string>();
+                activeServices.forEach(service => {
+                    if (service.categories && Array.isArray(service.categories)) {
+                        service.categories.forEach(cat => {
+                            if (cat && cat.trim()) {
+                                categoriesSet.add(cat);
+                            }
+                        });
+                    }
+                });
+
+                const extractedCategories = ['All', ...Array.from(categoriesSet).sort()];
+                setServiceCategories(extractedCategories);
+
+            } catch (err) {
+                console.error('Error fetching services:', err);
+                setServicesError('Failed to load services');
+            } finally {
+                setServicesLoading(false);
+            }
+        };
+
+        fetchServices();
+    }, []);
+
+    // Get current categories based on view mode
+    const currentCategories = viewMode === 'brands' ? brandCategories : serviceCategories;
+
+    // Filter items based on view mode, category, and search
+    const filteredItems = useMemo(() => {
+
+        if (viewMode === 'brands') {
+            let brandsToShow = getBrandsByCategory(selectedCategory);
+
+            if (searchTerm.trim()) {
+                const searchLower = searchTerm.toLowerCase();
+                brandsToShow = brandsToShow.filter(brand =>
+                    brand.brandName.toLowerCase().includes(searchLower) ||
+                    brand.tagline.toLowerCase().includes(searchLower) ||
+                    brand.description.toLowerCase().includes(searchLower) ||
+                    brand.categories.some(cat => cat.toLowerCase().includes(searchLower))
+                );
+            }
+
+            return brandsToShow;
+        } else {
+
+            let servicesToShow = selectedCategory === 'All'
+                ? services
+                : services.filter(service => {
+                    // Check if service has categories and if the selected category is in them
+                    const hasCategory = service.categories &&
+                        Array.isArray(service.categories) &&
+                        service.categories.some(cat => cat === selectedCategory);
+                    return hasCategory;
+                });
+
+
+            if (searchTerm.trim()) {
+                const searchLower = searchTerm.toLowerCase();
+                servicesToShow = servicesToShow.filter(service =>
+                    service.title.toLowerCase().includes(searchLower) ||
+                    service.description.toLowerCase().includes(searchLower) ||
+                    service.brandName.toLowerCase().includes(searchLower) ||
+                    (service.categories && service.categories.some(cat => cat.toLowerCase().includes(searchLower)))
+                );
+            }
+
+            return servicesToShow;
+        }
+    }, [viewMode, selectedCategory, searchTerm, getBrandsByCategory, services]);
+
+    // Pagination
+    const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
+    const paginatedItems = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        const endIndex = startIndex + ITEMS_PER_PAGE;
+        return filteredItems.slice(startIndex, endIndex);
+    }, [filteredItems, currentPage]);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [viewMode, selectedCategory, searchTerm]);
+
+    // Reset category to 'All' when switching view mode
+    useEffect(() => {
+        setSelectedCategory('All');
+        setCategoryScrollPosition(0);
+        if (categoryContainerRef.current) {
+            categoryContainerRef.current.scrollLeft = 0;
+        }
+    }, [viewMode]);
+
+    // Update scroll position when container scrolls
+    useEffect(() => {
+        const container = categoryContainerRef.current;
+        if (!container) return;
+
+        const handleScroll = () => {
+            setCategoryScrollPosition(container.scrollLeft);
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Force update scroll position when categories change
+    useEffect(() => {
+        const container = categoryContainerRef.current;
+        if (container) {
+            // Small delay to ensure DOM is updated
+            setTimeout(() => {
+                setCategoryScrollPosition(container.scrollLeft);
+            }, 100);
+        }
+    }, [currentCategories]);
+
+    // Category carousel functions
+    const scrollCategories = (direction: 'left' | 'right') => {
+        const container = categoryContainerRef.current;
+        if (!container) {
+            console.log('Container not found');
+            return;
+        }
+
+
+        const scrollAmount = 400; // Increased for better visibility
+        const newPosition = direction === 'left'
+            ? Math.max(0, container.scrollLeft - scrollAmount)
+            : Math.min(container.scrollWidth - container.clientWidth, container.scrollLeft + scrollAmount);
+        container.scrollTo({ left: newPosition, behavior: 'smooth' });
+    };
+
+    // Calculate scroll button states
+    const canScrollLeft = categoryScrollPosition > 0;
+    const canScrollRight = categoryContainerRef.current
+        ? categoryScrollPosition < (categoryContainerRef.current.scrollWidth - categoryContainerRef.current.clientWidth - 10)
+        : false;
+
+    const handleBrandAction = () => {
+        // Don't do anything if brand data is still loading
+        if (brandLoading) {
+            return;
+        }
+
+        if (!user || !isLoggedIn) {
+            navigate('auth');
+            return;
+        }
+
+        const status = getBrandStatus();
+
+        if (status === 'none' || status === 'rejected') {
+            navigate('make-brand-request');
+        } else if (status === 'pending') {
+            navigate('brand-status');
+        } else if (status === 'approved' || status === 'frozen') {
+            // Both approved and frozen brands should go to dashboard
+            navigate('brand-dashboard');
+        }
+    };
+
+    const getBrandButtonText = () => {
+        // Show loading text while brand data is loading
+        if (brandLoading) {
+            return 'Loading...';
+        }
+
+        if (!user || !isLoggedIn) return 'Make Brand';
+
+        const status = getBrandStatus();
+
+        switch (status) {
+            case 'pending':
+                return 'Check Request Status';
+            case 'approved':
+                return 'Manage Brand';
+            case 'frozen':
+                return 'Manage Brand'; // Frozen brands can still view their dashboard
+            case 'rejected':
+                return 'Make Brand';
+            default:
+                return 'Make Brand';
+        }
+    };
+
+    const shouldShowMakeBrandButton = () => {
+        if (!user || !isLoggedIn) return true; // Show for guest users to encourage login
+        if (brandLoading) return true; // Show while loading
+
+        // Hide if user is permanently banned from creating brands
+        if (brandRequest?.status === 'rejected' && brandRequest?.canResubmit === false) {
+            return false;
+        }
+
+        return true;
+    };
+
+
+    const isLoading = viewMode === 'brands' ? brandsLoading : servicesLoading;
+    const error = viewMode === 'brands' ? brandsError : servicesError;
+
+    return (
+        <div className="bg-[--color-bg-secondary] min-h-screen">
+            <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 pt-6 md:pt-6">
+                {/* Back Button */}
+                <motion.button
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3 }}
+                    onClick={() => navigate('home')}
+                    className="flex items-center gap-2 text-[--color-text-primary] hover:text-[--color-primary] transition-colors mb-4 text-sm md:text-base ml-0 sm:ml-0 lg:ml-6"
+                >
+                    <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
+                    <span className="font-medium">Go Back </span>
+                </motion.button>
+
+
+                {/* Header */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="text-center mb-4 md:mb-3"
+                >
+                    <ShoppingBag className="mx-auto h-8 md:h-7 w-8 md:w-7 text-[--color-primary] mb-2 md:mb-0" />
+                    <h1 className="text-2xl md:text-4xl lg:text-4xl font-bold mb-2 md:mb-1">FOGSLY MARKETPLACE</h1>
+                    <p className="text-sm md:text-md text-[--color-text-secondary] max-w-2xl mx-auto px-2">
+                        Discover professional brands and services from our curated marketplace.
+                    </p>
+                </motion.div>
+
+                {/* Search Bar and Action Button */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.1 }}
+                    className="max-w-2xl mx-auto mb-4 md:mb-4"
+                >
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-4">
+                        <div className="relative flex-grow">
+                            <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 md:w-4 h-4 md:h-4 text-[--color-text-secondary]" />
+                            <Input
+                                placeholder={viewMode === 'brands' ? "Search brands..." : "Search services..."}
+                                className="h-11 md:h-11 pl-10 md:pl-12 text-sm md:text-md bg-[--color-card] rounded-full shadow-sm w-full"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        {shouldShowMakeBrandButton() && (
+                            <Button
+                                size="lg"
+                                className="h-11 md:h-11 flex-shrink-0 text-sm md:text-md"
+                                onClick={handleBrandAction}
+                                disabled={brandLoading}
+                            >
+                                {getBrandButtonText()}
+                            </Button>
+                        )}
+                    </div>
+                </motion.div>
+
+                {/* View Mode Tabs */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.15 }}
+                    className="flex justify-center gap-2 mb-4 md:mb-4"
+                >
+                    <Button
+                        variant={viewMode === 'services' ? 'default' : 'outline'}
+                        onClick={() => setViewMode('services')}
+                        className="rounded-full px-4 md:px-8 text-sm md:text-sm"
+                        size="sm"
+                    >
+                        <Package className="w-3.5 md:w-4 h-3.5 md:h-4 mr-1.5 md:mr-2" />
+                        <span className="hidden sm:inline">e-Services</span>
+                        <span className="sm:hidden">e-Services</span>
+                        <span className="ml-1">({services.length})</span>
+                    </Button>
+                    <Button
+                        variant={viewMode === 'brands' ? 'default' : 'outline'}
+                        onClick={() => setViewMode('brands')}
+                        className="rounded-full px-4 md:px-8 text-sm md:text-sm"
+                        size="sm"
+                    >
+                        <ShoppingBag className="w-3.5 md:w-4 h-3.5 md:h-4 mr-1.5 md:mr-2" />
+                        <span className="hidden sm:inline">Brands</span>
+                        <span className="sm:hidden">Brands</span>
+                        <span className="ml-1">({approvedBrands.length})</span>
+                    </Button>
+
+                </motion.div>
+
+                {/* Category Filters with Carousel */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="mb-6 md:mb-6"
+                >
+                    <div className="relative max-w-5xl mx-auto">
+                        {/* Left Arrow - Hidden on mobile */}
+                        {currentCategories.length > MAX_VISIBLE_CATEGORIES && (
+                            <button
+                                onClick={() => scrollCategories('left')}
+                                disabled={!canScrollLeft}
+                                className={`hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-[--color-card] border border-[--color-border] rounded-full p-2 shadow-lg transition-all ${canScrollLeft ? 'opacity-100 hover:bg-[--color-bg-secondary] cursor-pointer' : 'opacity-30 cursor-not-allowed'
+                                    }`}
+                                aria-label="Scroll left"
+                            >
+                                <ChevronLeft className="w-5 h-5" />
+                            </button>
+                        )}
+
+                        {/* Categories Container */}
+                        <div
+                            ref={categoryContainerRef}
+                            className="overflow-x-auto scrollbar-hide"
+                            style={{
+                                scrollbarWidth: 'none',
+                                msOverflowStyle: 'none',
+                                paddingLeft: currentCategories.length > MAX_VISIBLE_CATEGORIES ? '0' : '0',
+                                paddingRight: currentCategories.length > MAX_VISIBLE_CATEGORIES ? '0' : '0'
+                            }}
+                        >
+                            <div className={`flex gap-1.5 md:gap-2 px-1 md:px-0 ${currentCategories.length > MAX_VISIBLE_CATEGORIES ? 'justify-start md:justify-start md:pl-12 md:pr-12' : 'justify-center'}`}>
+                                {currentCategories.map(category => {
+                                    let count = 0;
+                                    if (viewMode === 'brands') {
+                                        count = category === 'All'
+                                            ? approvedBrands.length
+                                            : getBrandsByCategory(category).length;
+                                    } else {
+                                        count = category === 'All'
+                                            ? services.length
+                                            : services.filter(s =>
+                                                s.categories &&
+                                                Array.isArray(s.categories) &&
+                                                s.categories.some(cat => cat === category)
+                                            ).length;
+                                    }
+
+                                    return (
+                                        <Button
+                                            key={category}
+                                            variant={selectedCategory === category ? 'default' : 'outline'}
+                                            onClick={() => setSelectedCategory(category)}
+                                            className="rounded-full whitespace-nowrap flex-shrink-0 text-xs md:text-sm px-3 md:px-4 h-8 md:h-8"
+                                            disabled={isLoading}
+                                        >
+                                            {category}
+                                            <span className="ml-1 text-[10px] md:text-xs opacity-70">
+                                                ({count})
+                                            </span>
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Right Arrow - Hidden on mobile */}
+                        {currentCategories.length > MAX_VISIBLE_CATEGORIES && (
+                            <button
+                                onClick={() => scrollCategories('right')}
+                                disabled={!canScrollRight}
+                                className={`hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-[--color-card] border border-[--color-border] rounded-full p-2 shadow-lg transition-all ${canScrollRight ? 'opacity-100 hover:bg-[--color-bg-secondary] cursor-pointer' : 'opacity-30 cursor-not-allowed'
+                                    }`}
+                                aria-label="Scroll right"
+                            >
+                                <ChevronRight className="w-5 h-5" />
+                            </button>
+                        )}
+                    </div>
+                </motion.div>
+
+                {/* Results Info */}
+                {/* <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3, delay: 0.25 }}
+                    className="text-center mb-6"
+                >
+                    <p className="text-[--color-text-secondary]">
+                        Showing {paginatedItems.length} of {filteredItems.length} {viewMode}
+                        {searchTerm && ` matching "${searchTerm}"`}
+                        {selectedCategory !== 'All' && ` in ${selectedCategory}`}
+                    </p>
+                </motion.div> */}
+
+                {/* Content Grid */}
+                {isLoading ? (
+                    <div className="flex items-center justify-center py-16">
+                        <div className="text-center">
+                            <Loader2 className="h-12 w-12 animate-spin text-[--color-primary] mx-auto mb-4" />
+                            <p className="text-[--color-text-secondary] text-lg">Loading {viewMode}...</p>
+                        </div>
+                    </div>
+                ) : error ? (
+                    <div className="text-center py-16">
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
+                            <p className="text-red-600 font-medium mb-2">Failed to load {viewMode}</p>
+                            <p className="text-red-500 text-sm">{error}</p>
+                        </div>
+                    </div>
+                ) : filteredItems.length === 0 ? (
+                    <div className="text-center py-16">
+                        <div className="text-6xl mb-4">😞</div>
+                        <h3 className="text-xl font-semibold text-[--color-text-primary] mb-2">
+                            {searchTerm ? `No ${viewMode} found` : `No ${viewMode} in this category`}
+                        </h3>
+                        <p className="text-[--color-text-secondary] max-w-md mx-auto">
+                            {searchTerm
+                                ? `No ${viewMode} match "${searchTerm}". Try adjusting your search terms.`
+                                : `There are no ${viewMode} in this category yet. Check back later!`
+                            }
+                        </p>
+                        {searchTerm && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setSearchTerm('')}
+                                className="mt-4"
+                            >
+                                Clear Search
+                            </Button>
+                        )}
+                    </div>
+                ) : (
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={`${viewMode}-${currentPage}`}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.3 }}
+                        >
+                            {viewMode === 'brands' ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                    {paginatedItems.map((brand: any, index) => (
+                                        <ApprovedBrandCardWithTruncate
+                                            key={brand.id}
+                                            brand={brand}
+                                            navigate={navigate}
+                                            index={index}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 px-4">
+                                    {paginatedItems.map((service: any, index) => (
+                                        <ServiceCard
+                                            key={service.id}
+                                            service={service}
+                                            navigate={navigate}
+                                            index={index}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
+                )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.3, delay: 0.3 }}
+                        className="flex justify-center items-center gap-1.5 md:gap-2 mt-6 md:mt-8"
+                    >
+                        <Button
+                            variant="outline"
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className="rounded-full w-8 h-8 md:w-10 md:h-10 p-0"
+                        >
+                            <ChevronLeft className="w-3.5 md:w-4 h-3.5 md:h-4" />
+                        </Button>
+
+                        <div className="flex gap-1.5 md:gap-2">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                                // Show first page, last page, current page, and pages around current
+                                if (
+                                    page === 1 ||
+                                    page === totalPages ||
+                                    (page >= currentPage - 1 && page <= currentPage + 1)
+                                ) {
+                                    return (
+                                        <Button
+                                            key={page}
+                                            variant={currentPage === page ? 'default' : 'outline'}
+                                            onClick={() => setCurrentPage(page)}
+                                            className="rounded-full w-8 h-8 md:w-10 md:h-10 p-0 text-xs md:text-sm"
+                                        >
+                                            {page}
+                                        </Button>
+                                    );
+                                } else if (
+                                    page === currentPage - 2 ||
+                                    page === currentPage + 2
+                                ) {
+                                    return <span key={page} className="flex items-center text-xs md:text-sm">...</span>;
+                                }
+                                return null;
+                            })}
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                            className="rounded-full w-8 h-8 md:w-10 md:h-10 p-0"
+                        >
+                            <ChevronRight className="w-3.5 md:w-4 h-3.5 md:h-4" />
+                        </Button>
+                    </motion.div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// Wrapper for ApprovedBrandCard with truncate functionality
+const ApprovedBrandCardWithTruncate = ({ brand, navigate, index }: { brand: any; navigate: (route: Route, context?: any, options?: { name?: string }) => void; index: number }) => {
+    const [showPopover, setShowPopover] = useState(false);
+    const titleRef = useRef<HTMLDivElement>(null);
+    const [isTruncated, setIsTruncated] = useState(false);
+
+    useEffect(() => {
+        if (titleRef.current) {
+            setIsTruncated(titleRef.current.scrollWidth > titleRef.current.clientWidth);
+        }
+    }, [brand.brandName]);
+
+    return (
+        <div className="relative">
+            <div 
+                ref={titleRef}
+                onMouseEnter={() => isTruncated && setShowPopover(true)}
+                onMouseLeave={() => setShowPopover(false)}
+            >
+                <ApprovedBrandCard
+                    brand={brand}
+                    navigate={navigate}
+                    index={index}
+                />
+            </div>
+            
+            {showPopover && isTruncated && (
+                <div className="absolute z-50 left-1/2 -translate-x-1/2 top-20 bg-[--color-card] border border-[--color-border] text-[--color-text-primary] text-sm px-3 py-2 rounded-lg shadow-lg max-w-xs whitespace-normal">
+                    {brand.brandName}
+                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[--color-card] border-l border-t border-[--color-border] transform rotate-45"></div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Service Card Component
+const ServiceCard = ({ service, navigate, index }: { service: BrandService; navigate: (route: Route, context?: any, options?: { name?: string }) => void; index: number }) => {
+    const firstPackage = service.pricing.type === 'fixed' && service.pricing.packages && service.pricing.packages.length > 0
+        ? service.pricing.packages[0]
+        : null;
+
+    const hourlyRate = service.pricing.type === 'hourly' && service.pricing.hourlyRate
+        ? service.pricing.hourlyRate
+        : null;
+
+    const displayPrice = firstPackage
+        ? `${firstPackage.currency} ${firstPackage.price.toLocaleString()}`
+        : hourlyRate
+            ? `${hourlyRate.currency} ${hourlyRate.rate.toLocaleString()}/hr`
+            : 'Contact for price';
+
+    const deliveryTime = firstPackage?.deliveryTime || 'Contact for details';
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.05 }}
+            className="bg-[--color-card] border border-[--color-border] rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer group"
+            onClick={() => navigate('fog-service-detail', service.id, { name: service.title })}
+        >
+            <div className="relative overflow-hidden aspect-[15/10]">
+                <img
+                    src={service.mainImage}
+                    alt={service.title}
+                    className="w-full h-full group-hover:scale-110 transition-transform duration-300"
+                />
+            </div>
+
+            <div className=" pt-3 pb-3 px-3 md:px-4">
+                {/* Brand Info */}
+                <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2">
+                    {service.brandLogo ? (
+                        <img
+                            src={service.brandLogo}
+                            alt={service.brandName}
+                            className="w-5 md:w-7 h-5 md:h-7 rounded-full object-cover"
+                        />
+                    ) : (
+                        <div className="w-5 md:w-7 h-5 md:h-7 rounded-full bg-gradient-to-br from-[--color-primary] to-[--color-primary]/80 flex items-center justify-center text-white text-[10px] md:text-xs font-bold">
+                            {service.brandName[0]}
+                        </div>
+                    )}
+                    <span className="text-xs md:text-sm text-[--color-text-secondary] truncate">{service.brandName}</span>
+                </div>
+
+                {/* Title */}
+                <h3 className="font-semibold text-sm md:text-base text-[--color-text-primary] mb-1.5 md:mb-1 line-clamp-2 min-h-[2rem] md:min-h-[2rem]">
+                    {service.title}
+                </h3>
+
+                {/* Rating */}
+                <div className="flex justify-between items-center mb-2 md:mb-3">
+                    <div className="flex items-center gap-1 ">
+                        <Star size={12} className="fill-yellow-400 text-yellow-400 md:w-3.5 md:h-3.5" />
+                        <span className="text-xs md:text-sm font-medium">
+                            {service.stats.rating || 0}
+                        </span>
+                        <span className="text-[10px] md:text-xs text-[--color-text-secondary]">
+                            ({service.stats.reviews || 0})
+                        </span>
+                    </div>
+
+                    <div className="category-badge text-end ">
+                        <Badge variant="secondary" className="bg-white/90 text-black backdrop-blur-sm text-[10px] md:text-xs">
+                            {service.categories[0] || 'Service'}
+                        </Badge>
+                    </div>
+
+                </div>
+
+
+                {/* Price and Delivery */}
+                <div className="flex items-center justify-between pt-2 md:pt-3 border-t border-[--color-border]">
+                    <div>
+                        <div className="text-[10px] md:text-xs text-[--color-text-secondary] mb-0.5 md:mb-1">Starting at</div>
+                        <div className="font-bold text-sm md:text-base text-[--color-primary]">
+                            {displayPrice}
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-[10px] md:text-xs text-[--color-text-secondary] mb-0.5 md:mb-1">Delivery</div>
+                        <div className="text-xs md:text-sm font-medium text-[--color-text-primary]">
+                            {deliveryTime === 'Contact for details' ? "Contact" : deliveryTime  }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </motion.div>
+    );
+};
+
+export default FogServicesPage;

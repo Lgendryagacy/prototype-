@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="corpGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b132b" />
+      <stop offset="100%" stop-color="#1c2541" />
+    </linearGradient>
+    <linearGradient id="redAccent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#d90429" />
+      <stop offset="100%" stop-color="#ef233c" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="360" fill="url(#corpGrad)" />
+  <!-- Skyline silhouettes -->
+  <rect x="40" y="190" width="45" height="170" fill="#243054" />
+  <rect x="95" y="150" width="60" height="210" fill="#2b3a67" />
+  <rect x="165" y="210" width="40" height="150" fill="#243054" />
+  <rect x="390" y="160" width="55" height="200" fill="#2b3a67" />
+  <rect x="455" y="130" width="50" height="230" fill="#243054" />
+  <rect x="515" y="180" width="45" height="180" fill="#1f2845" />
+  <!-- Grid glow -->
+  <circle cx="300" cy="180" r="160" fill="#4361ee" opacity="0.12" />
+  <!-- Badge -->
+  <rect x="80" y="60" width="440" height="240" rx="16" fill="#ffffff" filter="drop-shadow(0 15px 30px rgba(0,0,0,0.3))" />
+  <rect x="80" y="60" width="440" height="10" rx="4" fill="url(#redAccent)" />
+  <text x="300" y="115" font-family="'Inter', sans-serif" font-weight="800" font-size="12" fill="#d90429" text-anchor="middle" letter-spacing="3">CEO MINDS PAKISTAN PRESENTS</text>
+  <text x="300" y="165" font-family="'Montserrat', sans-serif" font-weight="900" font-size="28" fill="#0b132b" text-anchor="middle">THE PAKISTAN BUSINESS</text>
+  <text x="300" y="205" font-family="'Montserrat', sans-serif" font-weight="900" font-size="28" fill="#3a86ff" text-anchor="middle">EXCELLENCE SUMMIT</text>
+  <rect x="230" y="235" width="140" height="36" rx="8" fill="url(#redAccent)" />
+  <text x="300" y="259" font-family="'Inter', sans-serif" font-weight="800" font-size="14" fill="#ffffff" text-anchor="middle" letter-spacing="2">2026 EDITION</text>
+</svg>

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4facfe" />
+      <stop offset="100%" stop-color="#00f2fe" />
+    </linearGradient>
+    <linearGradient id="bannerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff416c" />
+      <stop offset="100%" stop-color="#ff4b2b" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="360" fill="url(#skyGrad)" />
+  <!-- Clouds & Sun -->
+  <circle cx="500" cy="80" r="45" fill="#fff5cc" opacity="0.9" />
+  <circle cx="120" cy="70" r="35" fill="#ffffff" opacity="0.85" />
+  <circle cx="155" cy="65" r="45" fill="#ffffff" opacity="0.9" />
+  <circle cx="190" cy="75" r="30" fill="#ffffff" opacity="0.85" />
+  <!-- Ground -->
+  <ellipse cx="300" cy="380" rx="420" ry="120" fill="#78c850" />
+  <ellipse cx="300" cy="390" rx="380" ry="100" fill="#5cb338" />
+  <!-- Carnival Tents -->
+  <polygon points="120,310 200,160 280,310" fill="#e63946" />
+  <polygon points="160,310 200,160 240,310" fill="#f1faee" />
+  <polygon points="320,310 400,170 480,310" fill="#e63946" />
+  <polygon points="360,310 400,170 440,310" fill="#f1faee" />
+  <polygon points="220,310 300,140 380,310" fill="#ffb703" />
+  <polygon points="260,310 300,140 340,310" fill="#fb8500" />
+  <!-- Pennant Strings -->
+  <path d="M 50,110 Q 300,170 550,110" stroke="#ffffff" stroke-width="2" fill="none" opacity="0.8" />
+  <polygon points="100,123 115,145 130,128" fill="#ff006e" />
+  <polygon points="180,138 195,162 210,142" fill="#3a86ff" />
+  <polygon points="260,147 275,172 290,149" fill="#ffbe0b" />
+  <polygon points="340,147 355,172 370,148" fill="#8338ec" />
+  <polygon points="420,138 435,160 450,141" fill="#06d6a0" />
+  <!-- Main Banner Card -->
+  <rect x="90" y="70" width="420" height="110" rx="14" fill="#ffffff" filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.18))" />
+  <rect x="94" y="74" width="412" height="102" rx="11" fill="none" stroke="#ff416c" stroke-width="2.5" stroke-dasharray="8 4" />
+  <text x="300" y="125" font-family="'Inter', 'Montserrat', sans-serif" font-weight="900" font-size="34" fill="#d90429" text-anchor="middle" letter-spacing="1">SOCIETIES FAIR '26</text>
+  <text x="300" y="156" font-family="'Inter', sans-serif" font-weight="700" font-size="12" fill="#3a86ff" text-anchor="middle" letter-spacing="3">UNITE, ENGAGE &amp; INSPIRE</text>
+</svg>

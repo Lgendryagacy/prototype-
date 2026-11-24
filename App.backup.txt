@@ -1,0 +1,1246 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { type Theme, type Route } from './types';
+import Header from './components/Header';
+import HomePage from './pages/HomePage';
+import FogCoinsPage from './pages/FogCoinsPage';
+import AuthPage from './pages/AuthPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import Footer from './components/Footer';
+import ProfilePage from './pages/ProfilePage';
+import DashboardPage from './pages/DashboardPage';
+import { EarningsDashboardPage } from './pages/EarningsDashboardPage';
+import EventsPage from './pages/EventsPage';
+import EventDetailPage from './pages/EventDetailPage';
+import CreateEventPage from './pages/CreateEventPage';
+import EventParticipantsPage from './pages/EventParticipantsPage';
+import EventRequestStatusPage from './pages/EventRequestStatusPage';
+import ManageEventsPage from './pages/ManageEventsPage';
+// import WatchAdsPage from './pages/WatchAdsPage';
+import PricingPage from './pages/PricingPage';
+import AboutPage from './pages/AboutPage';
+import CareersPage from './pages/CareersPage';
+import PressPage from './pages/PressPage';
+import TeamPage from './pages/TeamPage';
+import BlogPage from './pages/BlogPage';
+import BlogPostPage from './pages/BlogPostPage';
+import FeaturesPage from './pages/FeaturesPage';
+import ApiPage from './pages/ApiPage';
+import HelpCenterPage from './pages/HelpCenterPage';
+import CommunityPage from './pages/CommunityPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsPage from './pages/TermsPage';
+import FloatingActionButton from './components/FloatingActionButton';
+import UnifiedMessagesPage from './pages/UnifiedMessagesPage';
+import CustomerServicePage from './pages/CustomerServicePage';
+import RankCongratulationsModal from './components/modals/RankCongratulationsModal';
+import { onAuthStateChange, signOutUser } from './firebase/services/authService';
+import { clearFogCoinSettingsCache } from './utils/fogCoinUtils';
+import { getUserProfile, getUserData } from './firebase/services/userService';
+import { isUserAdmin } from './firebase/services/adminPromotion';
+import { User } from './firebase/types/user';
+import { toast, Toaster } from 'react-hot-toast';
+import WatchAdPage from './pages/WatchAdPage';
+import AdAnalyticsPage from './pages/admin/AdAnalyticsPage';
+import NotFoundPage from './pages/NotFoundPage';
+import CountdownPage from './pages/CountdownPage';
+import ContractsPage from './pages/ContractsPage';
+import { isLaunched, isRouteAllowedDuringCountdown } from './utils/launchUtils';
+import { isEligibleForRank } from './utils/rankUtils';
+import './utils/launchUtils'; // Import to make emergency function available 
+import PostJobPage from './pages/PostJobPage';
+import JobRequestsStatusPage from './pages/JobRequestsStatusPage';
+import FindWorkPage from './pages/FindWorkPage';
+import ManageJobsPage from './pages/ManageJobsPage';
+import JobDetailPage from './pages/JobDetailPage';
+import TaskerHubPage from './pages/TaskerHubPage';
+import PostTaskPage from './pages/PostTaskPage';
+import FogServicesPage from './pages/FogServicesPage';
+import FogServiceBrandPage from './pages/FogServiceBrandPage';
+import FogServiceDetailPage from './pages/FogServiceDetailPage';
+import ReferralsPage from './pages/ReferralsPage';
+import BrandMessagesPage from './pages/BrandMessagesPage';
+import MakeBrandPage from './pages/MakeBrandPage';
+import MakeBrandRequestPage from './pages/MakeBrandRequestPage';
+import BrandDashboardPage from './pages/BrandDashboardPage';
+import BrandStatusPage from './pages/BrandStatusPage';
+import StartFreelancingPage from './pages/StartFreelancingPage';
+import BecomeFreelancerPage from './pages/BecomeFreelancerPage';
+import FreelancerRequestStatusPage from './pages/FreelancerRequestStatusPage';
+import ManageGigsPage from './pages/ManageGigsPage';
+import EditGigPage from './pages/EditGigPage';
+import GigDetailPage from './pages/GigDetailPage';
+import SubmitProposalPage from './pages/SubmitProposalPage';
+import HireTaskerPage from './pages/HireTaskerPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import ReferralCodeMigrationPage from './pages/admin/ReferralCodeMigrationPage';
+import AppDownloadPopup from './components/AppDownloadPopup';
+import PublicProfilePage from './pages/PublicProfilePage';
+import SavedJobsPage from './pages/SavedJobsPage';
+import SavedPhysicalJobsPage from './pages/SavedPhysicalJobsPage';
+import ApplyJobPage from './pages/ApplyJobPage';
+import MyApplicationsPage from './pages/MyApplicationsPage';
+import JobApplicationsPage from './pages/JobApplicationsPage';
+import FogJobsPage from './pages/FogPhysicalJobsPage';
+import FogPhysicalJobDetailsPage from './pages/FogPhysicalJobDetailsPage';
+import PostPhysicalJobPage from './pages/PostPhysicalJobPage';
+import ManagePhysicalJobsPage from './pages/ManagePhysicalJobsPage';
+import PhysicalJobApplicantsPage from './pages/PhysicalJobApplicantsPage';
+import PhysicalJobApplicationPage from './pages/PhysicalJobApplicationPage';
+import PhysicalJobRequestStatusPage from './pages/PhysicalJobRequestStatusPage';
+import MyFogJobApplicationsPage from './pages/MyFogJobApplicationsPage';
+import GiveawaysPage from './pages/GiveawaysPage';
+import MyGiveawayRequests from './pages/MyGiveawayRequests';
+import ManageMyGiveaways from './pages/ManageMyGiveaways';
+import { FloatingDockNav } from './components/FloatingDockNav';
+import AIAssistantPage from './pages/AIAssistantPage';
+import { updateDocumentSEO, getRouteSEO } from './utils/seoUtils';
+
+// Add ViewState type export
+export type ViewState = 'home' | 'wallet' | string;
+
+// Helper function to get route from URL
+const getRouteFromPath = (pathname: string): Route => {
+  const path = pathname.replace('/', '') || 'home';
+
+  // Site is now live - no countdown restrictions
+
+  // Handle admin sub-routes
+  if (path.startsWith('admin/ad-analytics/')) {
+    return 'admin/ad-analytics';
+  }
+
+  // Handle dynamic brand routes (e.g., /brand/brand-name-id)
+  if (path.startsWith('brand/')) {
+    return 'fog-service-brand';
+  }
+
+  // Handle dynamic service routes (e.g., /service/service-name-id)
+  if (path.startsWith('service/')) {
+    return 'fog-service-detail';
+  }
+
+  // Handle dynamic job routes (e.g., /job/job-title-id)
+  if (path.startsWith('job/')) {
+    return 'job-detail';
+  }
+
+  // Handle dynamic user profile routes (e.g., /user/userId)
+  if (path.startsWith('user/')) {
+    return 'public-profile';
+  }
+
+  // Handle dynamic event detail routes (e.g., /event/event-name-id)
+  if (path.startsWith('event/')) {
+    return 'event-detail';
+  }
+
+  // Handle dynamic event participants routes (e.g., /event-participants/eventId)
+  if (path.startsWith('event-participants/')) {
+    return 'event-participants';
+  }
+
+  // Handle dynamic gig routes (e.g., /gig-detail/web-development-gigId)
+  if (path.startsWith('gig-detail/')) {
+    return 'gig-detail';
+  }
+
+  // Handle dynamic job applications routes (e.g., /job-applications/job-title-id)
+  if (path.startsWith('job-applications/')) {
+    return 'job-applications';
+  }
+
+  // Handle dynamic apply job routes (e.g., /apply-job/job-title-id)
+  if (path.startsWith('apply-job/')) {
+    return 'apply-job';
+  }
+
+  // Handle dynamic physical job details routes (e.g., /physical-job-details/job-id)
+  if (path.startsWith('physical-job-details/')) {
+    return 'physical-job-details';
+  }
+
+  // Handle dynamic physical job application routes (e.g., /physical-job-application/job-id)
+  if (path.startsWith('physical-job-application/')) {
+    return 'physical-job-application';
+  }
+
+  // Handle dynamic physical job applicants routes (e.g., /physical-job-applicants/job-id)
+  if (path.startsWith('physical-job-applicants/')) {
+    return 'physical-job-applicants';
+  }
+
+  // Handle dynamic edit physical job routes (e.g., /edit-physical-job/job-id)
+  if (path.startsWith('edit-physical-job/')) {
+    return 'post-physical-job';
+  }
+
+  // Handle dynamic blog post routes (e.g., /blog-post/1)
+  if (path.startsWith('blog-post/')) {
+    return 'blog-post';
+  }
+
+  const validRoutes: Route[] = [
+    'home', 'fog-coins', 'auth', 'forgot-password', 'reset-password', 'dashboard', 'profile', 'public-profile', 'earnings-dashboard',
+    'events', 'event-detail', 'event-request-status', 'event-participants', 'manage-events', 'watch-ads', 'pricing', 'about', 'careers', 'press', 'blog', 'blog-post',
+    'features', 'api', 'help-center', 'community', 'privacy-policy',
+    'terms', 'chat', 'customer-service', 'admin/ad-analytics', 'admin/referral-migration', '404', 'countdown', 'post-job', 'contracts', 'find-work', 'job-detail', 'saved-jobs', 'apply-job', 'my-applications', 'job-applications', 'tasker-hub', 'post-task', 'start-freelancing', 'submit-proposal', 'hire-tasker', 'admin-dashboard', 'fog-services', 'fog-service-brand', 'fog-service-detail', 'brand-dashboard', 'make-brand', 'brand-status', 'messages', 'brand-messages', 'make-brand-request', 'referrals', 'freelancer-request-status', 'manage-gigs', 'gig-detail', 'edit-gig', 'become-freelancer', 'manage-jobs', 'job-requests-status', 'fog-jobs', 'fog-physical-job-detail', 'physical-job-details', 'post-physical-job', 'manage-physical-jobs', 'physical-job-applicants', 'physical-job-application', 'physical-job-request-status', 'my-fog-job-applications', 'saved-physical-jobs', 'giveaways', 'my-giveaway-requests', 'manage-my-giveaways', 'ai-assistant', 'create-event', 'team'
+  ];
+
+  return validRoutes.includes(path as Route) ? (path as Route) : '404';
+};
+
+// Helper function to extract ID from URL slug (e.g., "cool-brand-abc123" -> "abc123")
+const extractIdFromSlug = (slug: string): string => {
+  // Assume ID is the last part after the last hyphen
+  // Format: brand-name-with-hyphens-ID
+  const parts = slug.split('-');
+  return parts[parts.length - 1];
+};
+
+// Helper function to create URL slug from name and ID
+const createSlug = (name: string, id: string): string => {
+  const sanitizedName = name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .trim();
+  return `${sanitizedName}-${id}`;
+};
+
+export default function App() {
+  // Clear any test data on app start
+  localStorage.removeItem('fogsly-test-launch-date');
+
+  // Register Service Worker for PWA
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker
+          .register('/service-worker.js')
+          .then((registration) => {
+            console.log('✅ Service Worker registered successfully:', registration.scope);
+
+            // Force update to get new service worker version
+            registration.update();
+
+            // Check for updates periodically
+            setInterval(() => {
+              registration.update();
+            }, 60000); // Check every minute
+          })
+          .catch((error) => {
+            console.log('❌ Service Worker registration failed:', error);
+          });
+      });
+    }
+
+    // Global function to clear all caches (for debugging)
+    (window as any).clearAllCaches = async () => {
+      try {
+        console.log('🧹 Clearing all caches...');
+
+        // 1. Clear service worker caches
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map(name => caches.delete(name)));
+          console.log('✅ Cleared service worker caches:', cacheNames);
+        }
+
+        // 2. Unregister service workers
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map(reg => reg.unregister()));
+          console.log('✅ Unregistered service workers');
+        }
+
+        // 3. Clear localStorage
+        localStorage.clear();
+        console.log('✅ Cleared localStorage');
+
+        // 4. Clear sessionStorage
+        sessionStorage.clear();
+        console.log('✅ Cleared sessionStorage');
+
+        // 5. Clear in-memory caches
+        try {
+          clearFogCoinSettingsCache();
+          console.log('✅ Cleared in-memory caches');
+        } catch (e) {
+          console.log('⚠️ In-memory cache clearing skipped');
+        }
+
+        // 6. Clear IndexedDB (if you're using it)
+        if ('indexedDB' in window) {
+          try {
+            const databases = await indexedDB.databases();
+            await Promise.all(
+              databases.map(db => {
+                if (db.name) {
+                  return new Promise((resolve) => {
+                    const request = indexedDB.deleteDatabase(db.name!);
+                    request.onsuccess = () => resolve(true);
+                    request.onerror = () => resolve(false);
+                  });
+                }
+              })
+            );
+            console.log('✅ Cleared IndexedDB');
+          } catch (e) {
+            console.log('⚠️ IndexedDB clearing skipped (not critical)');
+          }
+        }
+
+        console.log('✅ All caches cleared! Please refresh the page.');
+        alert('All caches cleared successfully!\\n\\nThe page will reload now to apply changes.');
+        window.location.reload();
+      } catch (error) {
+        console.error('❌ Error clearing caches:', error);
+        alert('Error clearing caches. Please try manually refreshing the page.');
+      }
+    };
+
+    // Listen for successful PWA installation
+    window.addEventListener('appinstalled', (evt) => {
+      console.log('✅ PWA was installed successfully!');
+      // Track installation in localStorage
+      try {
+        localStorage.setItem('fogsly-app-download-attempted', 'true');
+        localStorage.setItem('fogsly-app-download-date', new Date().toISOString());
+      } catch (error) {
+        console.error('Error tracking installation:', error);
+      }
+    });
+  }, []);
+
+  // Load theme from localStorage or default to 'light'
+  const [currentTheme, setCurrentTheme] = useState<Theme>(() => {
+    const savedTheme = localStorage.getItem('fogsly-theme') as Theme;
+    return savedTheme && ['light', 'dark', 'desert'].includes(savedTheme) ? savedTheme : 'dark';
+  });
+  const [route, setRoute] = useState<Route>(() => getRouteFromPath(window.location.pathname));
+  const [routeContext, setRouteContext] = useState<any>(() => {
+    // Extract context from URL on initial load
+    const path = window.location.pathname;
+    if (path.startsWith('/brand/')) {
+      const slug = path.replace('/brand/', '');
+      return extractIdFromSlug(slug);
+    }
+    if (path.startsWith('/service/')) {
+      const slug = path.replace('/service/', '');
+      return extractIdFromSlug(slug);
+    }
+    if (path.startsWith('/job/')) {
+      const slug = path.replace('/job/', '');
+      return extractIdFromSlug(slug);
+    }
+    if (path.startsWith('/user/')) {
+      const userId = path.replace('/user/', '');
+      return userId;
+    }
+    if (path.startsWith('/event/')) {
+      const slug = path.replace('/event/', '');
+      return slug; // Return the full slug (event-name-id)
+    }
+    if (path.startsWith('/event-participants/')) {
+      const eventId = path.replace('/event-participants/', '');
+      return eventId;
+    }
+    if (path.startsWith('/gig-detail/')) {
+      const slug = path.replace('/gig-detail/', '');
+      const gigId = extractIdFromSlug(slug);
+      return { gigId };
+    }
+    if (path.startsWith('/job-applications/')) {
+      const slug = path.replace('/job-applications/', '');
+      return extractIdFromSlug(slug);
+    }
+    if (path.startsWith('/apply-job/')) {
+      const slug = path.replace('/apply-job/', '');
+      return extractIdFromSlug(slug);
+    }
+    if (path.startsWith('/blog-post/')) {
+      const postIdStr = path.replace('/blog-post/', '');
+      return parseInt(postIdStr, 10);
+    }
+    return null;
+  });
+
+  // Deep linking - Save intended destination before redirecting to auth
+  const [intendedRoute, setIntendedRoute] = useState<{ route: Route; context: any } | null>(null);
+
+  // Auth and modal state
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdminLoading, setIsAdminLoading] = useState(false);
+
+  // Congratulations modal state
+  const [showCongratulationsModal, setShowCongratulationsModal] = useState(false);
+  const [userRank, setUserRank] = useState<number | null>(null);
+
+  // Background rank loading and popup timing
+  const [rankLoadingTimer, setRankLoadingTimer] = useState<NodeJS.Timeout | null>(null);
+  const [popupTimer, setPopupTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // App download popup state
+  const [showAppDownloadPopup, setShowAppDownloadPopup] = useState(false);
+
+  // Apply theme when changed
+  const handleThemeChange = (newTheme: Theme) => {
+    setCurrentTheme(newTheme);
+    // Save theme preference to localStorage
+    localStorage.setItem('fogsly-theme', newTheme);
+  };
+
+  // Check if app download popup should be shown
+  useEffect(() => {
+    const shouldShowAppDownloadPopup = () => {
+      try {
+        // Don't show if user has already downloaded the app
+        const hasDownloaded = localStorage.getItem('fogsly-app-download-attempted');
+        if (hasDownloaded === 'true') {
+          console.log('❌ Popup hidden: User already installed app');
+          return false;
+        }
+
+        // Check if popup was dismissed recently
+        const lastDismiss = localStorage.getItem('fogsly-app-popup-last-dismiss');
+        if (lastDismiss) {
+          const lastDismissDate = new Date(lastDismiss);
+          const now = new Date();
+          const hoursSinceLastDismiss = (now.getTime() - lastDismissDate.getTime()) / (1000 * 60 * 60);
+
+          // Only wait 1 hour after each dismissal (changed from 24 hours)
+          if (hoursSinceLastDismiss < 1) {
+            console.log(`❌ Popup hidden: Dismissed ${Math.round(hoursSinceLastDismiss * 60)} minutes ago`);
+            return false;
+          }
+        }
+
+        // Check dismiss count - if dismissed more than 5 times, don't show again for a week
+        const dismissCount = parseInt(localStorage.getItem('fogsly-app-popup-dismiss-count') || '0');
+        if (dismissCount >= 5 && lastDismiss) {
+          const lastDismissDate = new Date(lastDismiss);
+          const now = new Date();
+          const daysSinceLastDismiss = (now.getTime() - lastDismissDate.getTime()) / (1000 * 60 * 60 * 24);
+
+          if (daysSinceLastDismiss < 7) {
+            console.log(`❌ Popup hidden: Dismissed ${dismissCount} times, wait ${Math.round(7 - daysSinceLastDismiss)} more days`);
+            return false;
+          }
+        }
+
+        // console.log('✅ Popup will be shown');
+        return true;
+      } catch (error) {
+        console.error('Error checking app download popup status:', error);
+        return false;
+      }
+    };
+
+    // Only show on main pages, not on auth pages
+    const allowedRoutes: Route[] = ['home', 'fog-services', 'find-work', 'tasker-hub', 'dashboard', 'profile'];
+    if (allowedRoutes.includes(route) && shouldShowAppDownloadPopup()) {
+      // Small delay to not conflict with other popups
+      const timer = setTimeout(() => {
+        setShowAppDownloadPopup(true);
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [route]);
+
+  useEffect(() => {
+    document.documentElement.className = currentTheme;
+  }, [currentTheme]);
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const newRoute = getRouteFromPath(window.location.pathname);
+      setRoute(newRoute);
+
+      // Extract context from URL when navigating back/forward
+      const path = window.location.pathname;
+      let context = null;
+
+      if (path.startsWith('/brand/')) {
+        const slug = path.replace('/brand/', '');
+        context = extractIdFromSlug(slug);
+      } else if (path.startsWith('/service/')) {
+        const slug = path.replace('/service/', '');
+        context = extractIdFromSlug(slug);
+      } else if (path.startsWith('/job/')) {
+        const slug = path.replace('/job/', '');
+        context = extractIdFromSlug(slug);
+      } else if (path.startsWith('/user/')) {
+        context = path.replace('/user/', '');
+      } else if (path.startsWith('/event/')) {
+        const slug = path.replace('/event/', '');
+        context = slug; // Return the full slug (event-name-id)
+      } else if (path.startsWith('/gig-detail/')) {
+        const slug = path.replace('/gig-detail/', '');
+        const gigId = extractIdFromSlug(slug);
+        context = { gigId };
+      } else if (path.startsWith('/job-applications/')) {
+        const slug = path.replace('/job-applications/', '');
+        context = extractIdFromSlug(slug);
+      } else if (path.startsWith('/apply-job/')) {
+        const slug = path.replace('/apply-job/', '');
+        context = extractIdFromSlug(slug);
+      } else if (path.startsWith('/blog-post/')) {
+        const postIdStr = path.replace('/blog-post/', '');
+        context = parseInt(postIdStr, 10);
+      }
+
+      setRouteContext(context);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Protect admin routes on direct URL access
+  useEffect(() => {
+    if (!isAuthLoading && !isAdminLoading) {
+      const currentPath = window.location.pathname;
+      const currentRoute = getRouteFromPath(currentPath);
+
+      // Check if trying to access admin routes
+      if (currentRoute === 'admin-dashboard' || currentRoute === 'admin/ad-analytics' || currentRoute === 'admin/referral-migration') {
+        if (!isLoggedIn) {
+          console.log('Direct admin route access denied: not logged in');
+          navigate('auth');
+        } else if (!isAdmin) {
+          console.log('Direct admin route access denied: not admin');
+          navigate('home');
+        }
+      }
+    }
+  }, [isAuthLoading, isAdminLoading, isLoggedIn, isAdmin, route]);
+
+  // Dynamically update document title and meta tags based on active route and context for SEO
+  useEffect(() => {
+    const seoConfig = getRouteSEO(route, routeContext);
+    updateDocumentSEO(seoConfig);
+  }, [route, routeContext]);
+
+  // Site is now live - no countdown restrictions needed
+
+  // ✅ New function to fetch user rank from users collection in background
+  const fetchUserRankInBackground = async (userId: string): Promise<number> => {
+    try {
+      const userData = await getUserData(userId);
+
+      if (userData && typeof userData.rank === 'number') {
+        return userData.rank;
+      } else {
+        console.log('No rank found for user in users collection, using default rank');
+        return 1337; // Default rank for new users
+      }
+    } catch (error) {
+      console.error('Error fetching user rank from users collection:', error);
+      return 1337;
+    }
+  };
+
+  // ✅ New function to schedule popup display (2 minutes delay)
+  const schedulePopupDisplay = (userId: string, isNewUserSession: boolean = false) => {
+    // Clear any existing timers
+    if (rankLoadingTimer) clearTimeout(rankLoadingTimer);
+    if (popupTimer) clearTimeout(popupTimer);
+
+    // Start loading rank in background immediately
+    const rankTimer = setTimeout(async () => {
+      try {
+        const actualRank = await fetchUserRankInBackground(userId);
+        const userIsAdmin = await isUserAdmin(userId);
+
+        // Only schedule popup if user is eligible and not admin
+        if (!userIsAdmin && isEligibleForRank(actualRank)) {
+          setUserRank(actualRank);
+
+          // Schedule popup to show after 2 minutes total
+          const showTimer = setTimeout(() => {
+            console.log('Showing congratulations modal after 2 minutes');
+            setShowCongratulationsModal(true);
+          }, 600); // 1 more minute (total 2 minutes)
+
+          setPopupTimer(showTimer);
+        }
+      } catch (error) {
+        console.error('Error in background rank loading:', error);
+      }
+    }, 10000); // Start loading after 10 seconds
+
+    setRankLoadingTimer(rankTimer);
+  };
+
+  useEffect(() => {
+    // Listen for authentication state changes
+    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
+      // console.log('Auth state changed:', {
+      //   user: firebaseUser?.email,
+      //   wasLoggedIn: isLoggedIn
+      // });
+
+      if (firebaseUser) {
+        // User is signed in
+        const user: User = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email!,
+          displayName: firebaseUser.displayName || undefined,
+          emailVerified: firebaseUser.emailVerified
+        };
+
+        const wasLoggedIn = isLoggedIn;
+        setCurrentUser(user);
+        setIsLoggedIn(true);
+
+        // Check if user is suspended before allowing login
+        try {
+          const userData = await getUserData(firebaseUser.uid);
+          if (userData && userData.status === 'suspended') {
+            console.log('Suspended user detected, logging out');
+            await signOutUser();
+            setCurrentUser(null);
+            setIsLoggedIn(false);
+            setIsAdmin(false);
+            alert('Your account has been suspended. Please contact support for assistance.');
+            navigate('home');
+            setIsAuthLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking user status:', error);
+        }
+
+        // Check if user is admin
+        setIsAdminLoading(true);
+        try {
+          let adminStatus = await isUserAdmin(firebaseUser.uid);
+          
+          // Auto-promote specific demo user
+          if (firebaseUser.email === 'crypticalmail@gmail.com' && !adminStatus) {
+            try {
+              const { promoteToAdmin } = await import('./firebase/services/adminPromotion');
+              const { updateUserFogCoins } = await import('./firebase/services/walletService');
+              await promoteToAdmin(firebaseUser.uid);
+              adminStatus = true;
+              console.log('Successfully auto-promoted demo user to admin!');
+              // Give 50,000 Starter FOG coins for testing
+              await updateUserFogCoins(firebaseUser.uid, 50000, 'deposit', 'Demo Starter Funds', 'deposit', 'deposit');
+            } catch (e) { 
+              console.error('Failed to auto-promote & fund demo user:', e); 
+            }
+          }
+          
+          setIsAdmin(adminStatus);
+        } catch (error) {
+          console.error('Error checking admin status:', error);
+          setIsAdmin(false);
+        } finally {
+          setIsAdminLoading(false);
+        }
+
+        // Only schedule popup for new login sessions (not for already logged in users)
+        if (!wasLoggedIn && !isAuthLoading) {
+          // console.log('New login detected, scheduling popup display');
+          schedulePopupDisplay(firebaseUser.uid, false);
+        }
+      } else {
+        // User is signed out
+        // console.log('User signed out');
+        setCurrentUser(null);
+        setIsLoggedIn(false);
+        setIsAdmin(false);
+        setIsAdminLoading(false);
+        setUserRank(null);
+        setShowCongratulationsModal(false);
+
+        // Clear any running timers
+        if (rankLoadingTimer) clearTimeout(rankLoadingTimer);
+        if (popupTimer) clearTimeout(popupTimer);
+      }
+      setIsAuthLoading(false);
+    });
+
+    // Cleanup subscription and timers on unmount
+    return () => {
+      unsubscribe();
+      if (rankLoadingTimer) clearTimeout(rankLoadingTimer);
+      if (popupTimer) clearTimeout(popupTimer);
+    };
+  }, [isLoggedIn, isAuthLoading, rankLoadingTimer, popupTimer]);
+
+  // Periodic check for suspended users (every 10 seconds for real-time enforcement)
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser) return;
+
+    const checkSuspensionStatus = async () => {
+      try {
+        const userData = await getUserData(currentUser.uid);
+        if (userData && userData.status === 'suspended') {
+          console.log('User account suspended, logging out immediately');
+
+          // Sign out the user
+          await signOutUser();
+
+          // Clear state
+          setCurrentUser(null);
+          setIsLoggedIn(false);
+          setIsAdmin(false);
+
+          // Show notification
+          toast.error('Your account has been suspended. Please contact support for assistance.', {
+            duration: 6000,
+            position: 'top-center',
+          });
+
+          // Navigate to home
+          navigate('home');
+        }
+      } catch (error) {
+        console.error('Error checking suspension status:', error);
+      }
+    };
+
+    // Check immediately on login
+    checkSuspensionStatus();
+
+    // Then check every 10 seconds for real-time enforcement
+    const intervalId = setInterval(checkSuspensionStatus, 10 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [isLoggedIn, currentUser]);
+
+  const navigate = (newRoute: Route | string, context: any = null, options?: { name?: string }) => {
+    // Site is now live - no launch restrictions
+
+    let urlPath = '';
+
+    // Handle navigation with parameters
+    if (typeof newRoute === 'string' && newRoute.startsWith('admin/ad-analytics/')) {
+      // Update URL for dynamic route
+      urlPath = `/${newRoute}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('admin/ad-analytics');
+      return;
+    }
+
+    // Handle physical job details with ID
+    if (typeof newRoute === 'string' && newRoute.startsWith('physical-job-details/')) {
+      urlPath = `/${newRoute}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('physical-job-details');
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // Handle physical job application with ID
+    if (typeof newRoute === 'string' && newRoute.startsWith('physical-job-application/')) {
+      urlPath = `/${newRoute}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('physical-job-application');
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // Handle event detail with slug (e.g., /event/event-name-id)
+    if (typeof newRoute === 'string' && newRoute.startsWith('event/')) {
+      urlPath = `/${newRoute}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('event-detail');
+      setRouteContext(context); // Pass the slug as context
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // Handle event participants with eventId (e.g., /event-participants/eventId)
+    if (typeof newRoute === 'string' && newRoute.startsWith('event-participants/')) {
+      urlPath = `/${newRoute}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('event-participants');
+      setRouteContext(context); // Pass the eventId as context
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // Handle user profile with ID (e.g., /user/userId)
+    if (typeof newRoute === 'string' && newRoute.startsWith('user/')) {
+      urlPath = `/${newRoute}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('public-profile');
+      setRouteContext(context); // Pass the userId as context
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // Handle physical job applicants with ID
+    if (typeof newRoute === 'string' && newRoute.startsWith('physical-job-applicants/')) {
+      urlPath = `/${newRoute}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('physical-job-applicants');
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // Handle edit physical job with ID
+    if (typeof newRoute === 'string' && newRoute.startsWith('edit-physical-job/')) {
+      urlPath = `/${newRoute}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('post-physical-job');
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // Create SEO-friendly URLs for brands and services
+    if (newRoute === 'fog-service-brand' && context && options?.name) {
+      const slug = createSlug(options.name, context);
+      urlPath = `/brand/${slug}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('fog-service-brand');
+      setRouteContext(context);
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (newRoute === 'fog-service-detail' && context && options?.name) {
+      const slug = createSlug(options.name, context);
+      urlPath = `/service/${slug}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('fog-service-detail');
+      setRouteContext(context);
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (newRoute === 'job-detail' && context && options?.name) {
+      const slug = createSlug(options.name, context);
+      urlPath = `/job/${slug}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('job-detail');
+      setRouteContext(context);
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (newRoute === 'job-applications' && context && options?.name) {
+      const slug = createSlug(options.name, context);
+      urlPath = `/job-applications/${slug}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('job-applications');
+      setRouteContext(context);
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (newRoute === 'apply-job' && context && options?.name) {
+      const slug = createSlug(options.name, context);
+      urlPath = `/apply-job/${slug}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('apply-job');
+      setRouteContext(context);
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (newRoute === 'public-profile' && context) {
+      urlPath = `/user/${context}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('public-profile');
+      setRouteContext(context);
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // Handle gig detail with slug
+    if (newRoute === 'gig-detail' && context?.gigId && context?.slug) {
+      urlPath = `/gig-detail/${context.slug}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('gig-detail');
+      setRouteContext({ gigId: context.gigId });
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // Handle blog post with ID
+    if (newRoute === 'blog-post' && context) {
+      urlPath = `/blog-post/${context}`;
+      window.history.pushState(null, '', urlPath);
+      setRoute('blog-post');
+      setRouteContext(context);
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // Regular navigation
+    urlPath = newRoute === 'home' ? '/' : `/${newRoute}`;
+    setRoute(newRoute as Route);
+    window.history.pushState(null, '', urlPath);
+    setRouteContext(context);
+    window.scrollTo(0, 0); // Scroll to top on page change
+  };
+
+  const handleLogin = () => {
+    setIsLoggedIn(true);
+
+    // Redirect to intended route after login
+    if (intendedRoute) {
+      const { route: targetRoute, context: targetContext } = intendedRoute;
+      setIntendedRoute(null);
+      navigate(targetRoute, targetContext);
+    }
+  };
+
+  // Remove the handleSignupStarted function as it's no longer needed
+
+  const handleLogout = async () => {
+    try {
+      await signOutUser();
+      setIsLoggedIn(false);
+      setCurrentUser(null);
+      setIsAdmin(false);
+      setIsAdminLoading(false);
+      setUserRank(null);
+      setShowCongratulationsModal(false);
+
+      // Clear any running timers
+      if (rankLoadingTimer) clearTimeout(rankLoadingTimer);
+      if (popupTimer) clearTimeout(popupTimer);
+
+      navigate('home');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const handleCloseCongratulationsModal = () => {
+    setShowCongratulationsModal(false);
+    // Navigate to home if not already there
+    // if (route !== 'home') {
+    //   navigate('home');
+    // }
+  };
+
+  // ✅ Updated test function to refetch actual rank and check eligibility
+  const triggerCongratulationsModal = async (testRank?: number) => {
+    let rankToUse: number;
+
+    if (testRank) {
+      // Use provided test rank
+      rankToUse = testRank;
+    } else if (currentUser) {
+      // Fetch actual user rank
+      rankToUse = await fetchUserRankInBackground(currentUser.uid);
+    } else {
+      // Default rank if no user
+      rankToUse = 1337;
+    }
+
+    // Only show modal if user is eligible (rank ≤ 1000)
+    if (!isEligibleForRank(rankToUse)) {
+      console.log(`User with rank ${rankToUse} is not eligible for congratulations modal`);
+      return;
+    }
+
+    setUserRank(rankToUse);
+    setShowCongratulationsModal(true);
+  };
+
+  // Make it available globally for testing
+  React.useEffect(() => {
+    (window as any).showRankModal = triggerCongratulationsModal;
+
+    // Test function for admin route protection
+    (window as any).testAdminAccess = () => {
+      // console.log('🧪 Testing admin route protection...');
+      // console.log('Current user:', currentUser?.email || 'Not logged in');
+      // console.log('Is admin:', isAdmin);
+      // console.log('Auth loading:', isAuthLoading);
+      // console.log('Admin loading:', isAdminLoading);
+
+      if (!isLoggedIn) {
+        console.log('❌ Not logged in - should redirect to auth');
+      } else if (!isAdmin) {
+        console.log('❌ Not admin - should redirect to home');
+      } else {
+        console.log('✅ Admin access granted');
+      }
+
+      // Try to navigate to admin dashboard
+      navigate('admin-dashboard');
+    };
+  }, [currentUser, isAdmin, isAuthLoading, isAdminLoading, isLoggedIn]);
+
+  // Define protected routes
+  // Define protected routes (routes that require authentication and will redirect to auth if not logged in)
+  const protectedRoutes: Route[] = [
+    'dashboard', 'profile', 'public-profile', 'earnings-dashboard', 'referrals', 'watch-ads',
+    'contracts', 'manage-jobs', 'saved-jobs', 'saved-physical-jobs', 'submit-proposal', 'post-task', 'start-freelancing',
+    'become-freelancer', 'freelancer-request-status', 'manage-gigs', 'gig-detail', 'edit-gig', 'messages',
+    'brand-messages', 'make-brand-request', 'make-brand', 'brand-status', 'brand-dashboard',
+    'post-job', 'job-requests-status', 'my-giveaway-requests', 'manage-my-giveaways', 'ai-assistant'
+  ];
+
+  // Handle protected route redirects
+  useEffect(() => {
+    if (!isAuthLoading && !isLoggedIn && protectedRoutes.includes(route)) {
+      console.log(`Protected route "${route}" accessed without login, redirecting to auth`);
+      setIntendedRoute({ route, context: routeContext });
+      navigate('auth');
+    }
+  }, [route, isLoggedIn, isAuthLoading, routeContext]);
+
+  const showHeaderAndFooter = route !== 'auth' && route !== 'forgot-password' && route !== 'reset-password' && route !== 'admin-dashboard' && route !== 'admin/referral-migration' && route !== 'countdown' && route !== 'ai-assistant' && !(route === 'dashboard' && !isLoggedIn) && !(route === 'profile' && !isLoggedIn) && !(route === 'earnings-dashboard' && !isLoggedIn);
+  const showFooter = false; // Footer removed as requested
+
+  const renderContent = () => {
+    // Show loading spinner while checking auth state
+    if (isAuthLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[--color-primary]"></div>
+        </div>
+      );
+    }
+
+    // Helper function to handle protected routes
+    const renderProtectedRoute = (component: React.ReactElement) => {
+      if (!isLoggedIn) {
+        // This shouldn't render because useEffect should redirect first
+        // But just in case, show loading
+        return (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[--color-primary]"></div>
+          </div>
+        );
+      }
+      return component;
+    };
+
+    switch (route) {
+      case 'home': return <HomePage navigate={navigate} isLoggedIn={isLoggedIn} />;
+      case 'fog-coins': return <FogCoinsPage navigate={navigate} />;
+      case 'fog-jobs': return <FogJobsPage navigate={navigate} />;
+      case 'fog-physical-job-detail': return <FogPhysicalJobDetailsPage navigate={navigate} />;
+      case 'physical-job-details': return <FogPhysicalJobDetailsPage navigate={navigate} />;
+      case 'post-physical-job': return <PostPhysicalJobPage navigate={navigate} />;
+      case 'manage-physical-jobs': return <ManagePhysicalJobsPage navigate={navigate} />;
+      case 'physical-job-applicants': return <PhysicalJobApplicantsPage navigate={navigate} />;
+      case 'physical-job-application': return <PhysicalJobApplicationPage navigate={navigate} />;
+      case 'physical-job-request-status': return <PhysicalJobRequestStatusPage navigateBack={() => navigate('fog-jobs')} />;
+      case 'my-fog-job-applications': return <MyFogJobApplicationsPage navigate={navigate} />;
+      
+
+      case 'auth': return <AuthPage navigate={navigate} onLogin={handleLogin} />;
+      case 'forgot-password': return <ForgotPasswordPage navigate={navigate} />;
+      case 'reset-password': {
+        // The ResetPasswordPage will handle extracting the code from URL parameters
+        return <ResetPasswordPage navigate={navigate} />;
+      }
+      case 'dashboard': return renderProtectedRoute(<DashboardPage />);
+      case 'profile': return renderProtectedRoute(<ProfilePage navigate={navigate} currentUser={currentUser} />);
+      case 'public-profile': return renderProtectedRoute(<PublicProfilePage navigate={navigate} userId={routeContext} />);
+      case 'earnings-dashboard': return renderProtectedRoute(<EarningsDashboardPage />);
+      case 'referrals': return renderProtectedRoute(<ReferralsPage navigate={navigate} />);
+      case 'events': return <EventsPage navigate={navigate} currentUser={currentUser} />;
+      case 'event-detail': return <EventDetailPage navigate={navigate} context={routeContext} currentUser={currentUser} isLoggedIn={isLoggedIn} />;
+      case 'create-event': return renderProtectedRoute(<CreateEventPage navigate={navigate} user={currentUser} isLoggedIn={!!currentUser} editEventData={routeContext?.editEventData} />);
+      case 'event-request-status': return renderProtectedRoute(<EventRequestStatusPage navigate={navigate} user={currentUser} />);
+      case 'event-participants': return renderProtectedRoute(<EventParticipantsPage navigate={navigate} context={routeContext} currentUser={currentUser} />);
+      case 'manage-events': return renderProtectedRoute(<ManageEventsPage navigate={navigate} currentUser={currentUser} />);
+      case 'giveaways': return <GiveawaysPage navigate={navigate} currentUser={currentUser} />;
+      case 'my-giveaway-requests': return renderProtectedRoute(<MyGiveawayRequests navigate={navigate} currentUser={currentUser} />);
+      case 'manage-my-giveaways': return renderProtectedRoute(<ManageMyGiveaways navigate={navigate} currentUser={currentUser} />);
+
+      case 'watch-ads': return renderProtectedRoute(<WatchAdPage navigate={navigate} />);
+      case 'pricing': return <PricingPage />;
+      case 'team': return <TeamPage navigate={navigate} />;
+      case 'about': return <AboutPage />;
+      case 'careers': return <CareersPage />;
+      case 'press': return <PressPage />;
+      case 'blog': return <BlogPage navigate={navigate} />;
+      case 'blog-post': return <BlogPostPage navigate={navigate} postId={routeContext} />;
+      case 'features': return <FeaturesPage />;
+      case 'api': return <ApiPage />;
+      case 'help-center': return <HelpCenterPage />;
+      case 'community': return <CommunityPage />;
+      case 'privacy-policy': return <PrivacyPolicyPage />;
+      case 'terms': return <TermsPage />;
+      case 'chat': return renderProtectedRoute(
+        <UnifiedMessagesPage 
+          navigate={navigate}
+          context={{ selectedUserId: routeContext?.userId }}
+          user={currentUser}
+          isLoggedIn={isLoggedIn}
+          onBack={() => navigate('home')} 
+        />
+      );
+
+      case 'customer-service': return <CustomerServicePage navigate={navigate} />;
+      case 'contracts': return renderProtectedRoute(<ContractsPage navigate={navigate} />);
+      case 'find-work': return <FindWorkPage navigate={navigate} isLoggedIn={isLoggedIn} />;
+      case 'manage-jobs': return renderProtectedRoute(<ManageJobsPage navigate={navigate} currentUser={currentUser} />);
+      case 'job-detail': return <JobDetailPage navigate={navigate} context={routeContext} currentUser={currentUser} />;
+      case 'saved-jobs': return renderProtectedRoute(<SavedJobsPage navigate={navigate} currentUser={currentUser} />);
+      case 'saved-physical-jobs': return renderProtectedRoute(<SavedPhysicalJobsPage navigate={navigate} currentUser={currentUser} />);
+      case 'apply-job': return <ApplyJobPage navigate={navigate} context={routeContext} currentUser={currentUser} isLoggedIn={isLoggedIn} />;
+      case 'my-applications': return <MyApplicationsPage navigate={navigate} currentUser={currentUser} isLoggedIn={isLoggedIn} />;
+      case 'job-applications': return <JobApplicationsPage navigate={navigate} context={routeContext} currentUser={currentUser} isLoggedIn={isLoggedIn} />;
+      case 'tasker-hub': return <TaskerHubPage navigate={navigate} />;
+      case 'hire-tasker': return <HireTaskerPage navigate={navigate} />;
+      case 'submit-proposal': return renderProtectedRoute(<SubmitProposalPage navigate={navigate} gigId={routeContext} />);
+      case 'post-task': return renderProtectedRoute(<PostTaskPage navigate={navigate} />);
+      case 'start-freelancing': return renderProtectedRoute(<StartFreelancingPage navigate={navigate} />);
+      case 'become-freelancer': return renderProtectedRoute(<BecomeFreelancerPage navigate={navigate} currentUser={currentUser} />);
+      case 'freelancer-request-status': return renderProtectedRoute(<FreelancerRequestStatusPage navigate={navigate} />);
+      case 'manage-gigs': return renderProtectedRoute(<ManageGigsPage navigate={navigate} />);
+      case 'ai-assistant': return renderProtectedRoute(<AIAssistantPage navigate={navigate} currentUser={currentUser} initialQuery={routeContext?.initialQuery} />);
+      case 'gig-detail': return renderProtectedRoute(<GigDetailPage navigate={navigate} context={routeContext} />);
+      case 'edit-gig': return renderProtectedRoute(<EditGigPage navigate={navigate} context={routeContext} />);
+      case 'fog-services': return <FogServicesPage navigate={navigate} user={currentUser} isLoggedIn={isLoggedIn} />;
+      case 'fog-service-brand': return <FogServiceBrandPage navigate={navigate} context={routeContext} />;
+      case 'fog-service-detail': return <FogServiceDetailPage navigate={navigate} context={routeContext} />;
+      case 'messages': return renderProtectedRoute(
+        <UnifiedMessagesPage 
+          navigate={navigate} 
+          context={routeContext} 
+          user={currentUser} 
+          isLoggedIn={isLoggedIn}
+          onBack={() => navigate('home')}
+        />
+      );
+      case 'brand-messages': return renderProtectedRoute(<BrandMessagesPage navigate={navigate} brandId={routeContext} user={currentUser} isLoggedIn={isLoggedIn} />);
+      case 'make-brand-request': return renderProtectedRoute(<MakeBrandRequestPage navigate={navigate} />);
+      case 'make-brand': return renderProtectedRoute(<MakeBrandPage navigate={navigate} user={currentUser} isLoggedIn={isLoggedIn} />);
+      case 'brand-status': return renderProtectedRoute(<BrandStatusPage navigate={navigate} user={currentUser} isLoggedIn={isLoggedIn} />);
+      case 'brand-dashboard': return renderProtectedRoute(<BrandDashboardPage navigate={navigate} user={currentUser} isLoggedIn={isLoggedIn} />);
+      case 'post-job': return renderProtectedRoute(<PostJobPage navigate={navigate} isLoggedIn={isLoggedIn} />);
+      case 'job-requests-status': return renderProtectedRoute(<JobRequestsStatusPage navigate={navigate} isLoggedIn={isLoggedIn} />);
+      case 'admin-dashboard': {
+        // Simple admin check without navigation redirects
+        if (!isLoggedIn) {
+          return <AuthPage navigate={navigate} onLogin={handleLogin} />;
+        }
+
+        if (isAdminLoading) {
+          return (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[--color-primary] mx-auto mb-4"></div>
+                <p className="text-[--color-text-secondary]">Verifying admin permissions...</p>
+              </div>
+            </div>
+          );
+        }
+
+        if (!isAdmin) {
+          return <HomePage navigate={navigate} isLoggedIn={isLoggedIn} />;
+        }
+
+        return <AdminDashboardPage navigate={navigate} />;
+      }
+      case 'admin/ad-analytics': {
+        // Simple admin check for analytics
+        if (!isLoggedIn || !isAdmin) {
+          return <HomePage navigate={navigate} isLoggedIn={isLoggedIn} />;
+        }
+
+        if (isAdminLoading) {
+          return (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[--color-primary] mx-auto mb-4"></div>
+                <p className="text-[--color-text-secondary]">Verifying admin permissions...</p>
+              </div>
+            </div>
+          );
+        }
+
+        // Extract ad ID from current URL
+        const currentPath = window.location.pathname;
+        const adId = currentPath.split('/').pop();
+        return <AdAnalyticsPage navigate={navigate} adId={adId} />;
+      }
+      case 'admin/referral-migration': {
+        // Admin check for referral migration
+        if (!isLoggedIn || !isAdmin) {
+          return <HomePage navigate={navigate} isLoggedIn={isLoggedIn} />;
+        }
+
+        if (isAdminLoading) {
+          return (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[--color-primary] mx-auto mb-4"></div>
+                <p className="text-[--color-text-secondary]">Verifying admin permissions...</p>
+              </div>
+            </div>
+          );
+        }
+
+        return <ReferralCodeMigrationPage />;
+      }
+      case '404': return <NotFoundPage navigate={navigate} />;
+      case 'countdown': return <CountdownPage />;
+      default: return <NotFoundPage navigate={navigate} />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-[--color-bg-primary] text-[--color-text-primary] transition-colors duration-300">
+      <Toaster
+        position="top-right"
+        containerStyle={{ zIndex: 99999 }}
+      />
+      {showHeaderAndFooter && (
+        <Header
+          currentTheme={currentTheme}
+          setCurrentTheme={handleThemeChange}
+          navigate={navigate}
+          isLoggedIn={isLoggedIn}
+          onLogout={handleLogout}
+          currentUser={currentUser}
+          currentRoute={route}
+        />
+      )}
+      <main className={`flex-1 ${showFooter ? 'pb-20 md:pb-0' : ''}`}>
+        {renderContent()}
+      </main>
+      {showFooter && <Footer navigate={navigate} />}
+      <FloatingActionButton
+        navigate={navigate}
+        currentPath={window.location.pathname}
+        currentUser={currentUser}
+      />
+
+
+      {/* ✅ Updated Rank Congratulations Modal with real rank */}
+      {userRank !== null && (
+        <RankCongratulationsModal
+          isOpen={showCongratulationsModal}
+          onClose={handleCloseCongratulationsModal}
+          userRank={userRank}
+          userName={currentUser?.displayName || currentUser?.email?.split('@')[0] || 'FOGSLY User'}
+          isNewUser={false} // Always false since we don't distinguish between new/returning users anymore
+        />
+      )}
+
+      {/* App Download Popup */}
+      {showAppDownloadPopup && (
+        <AppDownloadPopup onClose={() => setShowAppDownloadPopup(false)} />
+      )}
+
+      {/* Floating Dock Navigation - Hide on auth pages */}
+      {/* TODO: Floating dock under working - temporarily disabled */}
+      {/* {route !== 'auth' && route !== 'forgot-password' && route !== 'reset-password' && (
+        <FloatingDockNav onNavigate={(view) => navigate(view as Route)} />
+      )} */}
+
+    </div>
+  );
+}

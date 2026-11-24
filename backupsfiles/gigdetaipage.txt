@@ -1,0 +1,681 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../firebase/hooks/useAuth';
+import { getApprovedFreelancerById, updateFreelancerStatus, ApprovedFreelancer } from '../firebase/services/approvedFreelancers';
+import { getUserProfile } from '../firebase/services/userService';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import ReviewsList from '../components/ReviewsList';
+import {
+    User,
+    Mail,
+    Briefcase,
+    DollarSign,
+    Star,
+    TrendingUp,
+    Clock,
+    CheckCircle,
+    Search,
+    ExternalLink,
+    Loader,
+    AlertCircle,
+    Award,
+    Target,
+    Calendar,
+    Globe,
+    ArrowLeft,
+    Share2,
+    Edit,
+    ChevronDown,
+    Pause,
+    Play
+} from 'lucide-react';
+import { type Route } from '../types';
+import { toast } from 'react-hot-toast';
+
+const GigDetailPage = ({ navigate, context }: { navigate: (route: Route, context?: any) => void; context?: any }) => {
+    const { user: currentUser } = useAuth();
+    const [freelancer, setFreelancer] = useState<ApprovedFreelancer | null>(null);
+    const [userAvatar, setUserAvatar] = useState<string | null>(null);
+    const [userName, setUserName] = useState<string>('');
+    const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+    const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Extract gigId from context (passed during navigation or from URL)
+    console.log('GigDetailPage received context:', context);
+    const gigId = context?.gigId || context;
+    console.log('Extracted gigId:', gigId);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setShowStatusDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        if (gigId) {
+            fetchGigData();
+        } else {
+            setLoading(false);
+            toast.error('No gig ID provided');
+        }
+    }, [gigId]);
+
+    const fetchGigData = async () => {
+        if (!gigId) {
+            setLoading(false);
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const gigData = await getApprovedFreelancerById(gigId);
+            setFreelancer(gigData);
+
+            // Fetch user profile to get avatar
+            if (gigData?.userId) {
+                try {
+                    const userProfile = await getUserProfile(gigData.userId);
+                    if (userProfile) {
+                        setUserAvatar(userProfile.avatarUrl || null);
+                        setUserName(userProfile.name || userProfile.displayName || gigData.userName);
+                    }
+                } catch (error) {
+                    console.error('Error fetching user profile:', error);
+                    setUserName(gigData.userName);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching gig data:', error);
+            toast.error('Failed to load gig data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleToggleStatus = async (newStatus: 'active' | 'inactive') => {
+        if (!freelancer || !freelancer.id) return;
+
+        // Only allow the owner to toggle status
+        if (currentUser?.uid !== freelancer.userId) {
+            toast.error('You can only modify your own gigs');
+            return;
+        }
+
+        try {
+            setIsTogglingStatus(true);
+            setShowStatusDropdown(false);
+            await updateFreelancerStatus(freelancer.id, newStatus);
+            setFreelancer({ ...freelancer, status: newStatus });
+            toast.success(`Gig ${newStatus === 'active' ? 'activated' : 'paused'} successfully`);
+        } catch (error) {
+            console.error('Error updating status:', error);
+            toast.error('Failed to update status');
+        } finally {
+            setIsTogglingStatus(false);
+        }
+    };
+
+    const handleEditGig = () => {
+        if (freelancer?.id) {
+            navigate('edit-gig', { gigId: freelancer.id });
+        }
+    };
+
+    const handleShareGig = () => {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).then(() => {
+            toast.success('Gig URL copied to clipboard!');
+        }).catch(() => {
+            toast.error('Failed to copy URL');
+        });
+    };
+
+    // Filter portfolio items based on search
+    const filteredPortfolio = freelancer?.portfolioItems?.filter(item => {
+        const matchesSearch = searchQuery === '' ||
+            item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+        return matchesSearch;
+    }) || [];
+
+    // Check if current user is the owner of this gig
+    const isOwner = currentUser?.uid === freelancer?.userId;
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-[--color-bg-primary] flex items-center justify-center">
+                <div className="text-center">
+                    <Loader className="w-12 h-12 animate-spin text-[--color-primary] mx-auto mb-4" />
+                    <p className="text-[--color-text-secondary]">Loading gig details...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!freelancer) {
+        return (
+            <div className="min-h-screen bg-[--color-bg-primary]">
+                <div className="container mx-auto px-4 py-12">
+                    <Button
+                        variant="outline"
+                        onClick={() => navigate('find-work')}
+                        className="mb-6"
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Back to Find Work
+                    </Button>
+
+                    <Card className="max-w-2xl mx-auto">
+                        <CardContent className="p-12 text-center">
+                            <AlertCircle className="w-20 h-20 text-yellow-500 mx-auto mb-6" />
+                            <h2 className="text-3xl font-bold mb-4">Gig Not Found</h2>
+                            <p className="text-[--color-text-secondary] mb-4 text-lg">
+                                This gig doesn't exist or has been removed.
+                            </p>
+                            <div className="flex gap-4 justify-center">
+                                <Button
+                                    onClick={() => navigate('find-work')}
+                                    size="lg"
+                                >
+                                    Browse Freelancers
+                                </Button>
+                                {isOwner && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => navigate('manage-gigs')}
+                                        size="lg"
+                                    >
+                                        My Gigs
+                                    </Button>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-[--color-bg-primary]">
+            <div className="container mx-auto px-4 py-8">
+                <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
+                    <Button
+                        variant="outline"
+                        onClick={() => isOwner ? navigate('manage-gigs') : navigate('find-work')}
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        {isOwner ? 'Back to My Gigs' : 'Back to Find Work'}
+                    </Button>
+
+                    <div className="flex items-center gap-3">
+                        {/* Visit Profile Button - Only show for non-owners */}
+                        {!isOwner && freelancer && (
+                            <Button
+                                variant="outline"
+                                onClick={() => navigate('public-profile', freelancer.userId)}
+                            >
+                                <User className="w-4 h-4 mr-2" />
+                                Visit Profile
+                            </Button>
+                        )}
+
+                        {/* Share Button */}
+                        <Button
+                            variant="outline"
+                            onClick={handleShareGig}
+                        >
+                            <Share2 className="w-4 h-4 mr-2" />
+                            Share Gig
+                        </Button>
+
+                        {/* Owner Actions */}
+                        {isOwner && (
+                            <>
+                                {/* Edit Button */}
+                                <Button
+                                    variant="outline"
+                                    onClick={handleEditGig}
+                                    className="border-blue-500/30 text-blue-600 hover:bg-blue-500/10"
+                                >
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Edit Gig
+                                </Button>
+
+                                {/* Status Dropdown */}
+                                <div className="relative" ref={dropdownRef}>
+                                    <Button
+                                        onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                                        disabled={isTogglingStatus}
+                                        className={`${freelancer.status === 'active'
+                                            ? 'bg-green-500 hover:bg-green-600'
+                                            : 'bg-gray-500 hover:bg-gray-600'
+                                            }`}
+                                    >
+                                        {isTogglingStatus ? (
+                                            <Loader className="w-4 h-4 mr-2 animate-spin" />
+                                        ) : (
+                                            <>{freelancer.status === 'active' ? <CheckCircle className="w-4 h-4 mr-2" /> : <Clock className="w-4 h-4 mr-2" />}</>
+                                        )}
+                                        {freelancer.status === 'active' ? 'Active' : 'Paused'}
+                                        <ChevronDown className="w-4 h-4 ml-2" />
+                                    </Button>
+
+                                    {/* Dropdown Menu */}
+                                    <AnimatePresence>
+                                        {showStatusDropdown && !isTogglingStatus && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -10 }}
+                                                transition={{ duration: 0.2 }}
+                                                className="absolute right-0 top-full mt-2 w-48 bg-[--color-bg-primary] border border-[--color-border] rounded-lg shadow-xl z-50 overflow-hidden"
+                                            >
+                                                <button
+                                                    onClick={() => handleToggleStatus('active')}
+                                                    disabled={freelancer.status === 'active'}
+                                                    className={`w-full px-4 py-3 text-left hover:bg-[--color-bg-secondary] flex items-center gap-3 transition-colors ${freelancer.status === 'active' ? 'opacity-50 cursor-not-allowed' : ''
+                                                        }`}
+                                                >
+                                                    <Play className="w-4 h-4 text-green-500" />
+                                                    <span>Set Active</span>
+                                                    {freelancer.status === 'active' && (
+                                                        <CheckCircle className="w-4 h-4 ml-auto text-green-500" />
+                                                    )}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleToggleStatus('inactive')}
+                                                    disabled={freelancer.status === 'inactive'}
+                                                    className={`w-full px-4 py-3 text-left hover:bg-[--color-bg-secondary] flex items-center gap-3 transition-colors ${freelancer.status === 'inactive' ? 'opacity-50 cursor-not-allowed' : ''
+                                                        }`}
+                                                >
+                                                    <Pause className="w-4 h-4 text-orange-500" />
+                                                    <span>Pause Gig</span>
+                                                    {freelancer.status === 'inactive' && (
+                                                        <CheckCircle className="w-4 h-4 ml-auto text-gray-500" />
+                                                    )}
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-6"
+                >
+                    {/* Header with Profile Summary */}
+                    <Card className="border-2 border-[--color-border]">
+                        <CardContent className="p-6 pt-6">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                                <div className="flex items-center gap-4">
+                                    {userAvatar ? (
+                                        <img
+                                            src={userAvatar}
+                                            alt={userName || freelancer.fullName}
+                                            className="w-20 h-20 rounded-full object-cover border-2 border-[--color-border]"
+                                        />
+                                    ) : (
+                                        <div className="w-20 h-20 bg-gradient-to-br from-[--color-primary] to-purple-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
+                                            {(userName || freelancer.fullName).charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <h1 className="text-3xl font-bold">{freelancer.fullName}</h1>
+                                        <p className="text-xl text-[--color-text-secondary]">{freelancer.title}</p>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <Badge className={`${freelancer.status === 'active'
+                                                ? 'bg-green-500/20 text-green-600'
+                                                : 'bg-gray-500/20 text-gray-600'
+                                                }`}>
+                                                {freelancer.status === 'active' ? '🟢 Available for Work' : '⚪ Not Available'}
+                                            </Badge>
+                                            <Badge variant="outline" className="capitalize">
+                                                {freelancer.experience} Level
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <Card>
+                            <CardContent className="pt-6 p-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-[--color-text-secondary]">Total Jobs</p>
+                                        <h3 className="text-3xl font-bold mt-2">{freelancer.totalJobs}</h3>
+                                    </div>
+                                    <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center">
+                                        <Briefcase className="w-6 h-6 text-blue-500" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardContent className="pt-6 p-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-[--color-text-secondary]">Total Reviews</p>
+                                        <h3 className="text-3xl font-bold mt-2">{freelancer.totalReviews}</h3>
+                                    </div>
+                                    <div className="w-12 h-12 bg-yellow-500/10 rounded-full flex items-center justify-center">
+                                        <Star className="w-6 h-6 text-yellow-500" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardContent className="pt-6 p-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-[--color-text-secondary]">Total Earnings</p>
+                                        <h3 className="text-3xl font-bold mt-2"> {freelancer.totalEarnings.toFixed(0)} FOG</h3>
+                                    </div>
+                                    <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center">
+                                        <TrendingUp className="w-6 h-6 text-green-500" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardContent className="pt-6 p-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-[--color-text-secondary]">Avg Rating</p>
+                                        <h3 className="text-3xl font-bold mt-2">{freelancer.averageRating.toFixed(1)} ⭐</h3>
+                                    </div>
+                                    <div className="w-12 h-12 bg-purple-500/10 rounded-full flex items-center justify-center">
+                                        <Award className="w-6 h-6 text-purple-500" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Profile Information */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Left Column - Profile Details */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {/* Bio */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Professional Bio</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-[--color-text-primary] whitespace-pre-wrap leading-relaxed">
+                                        {freelancer.bio}
+                                    </p>
+                                </CardContent>
+                            </Card>
+
+                            {/* Skills & Categories */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Skills & Expertise</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div>
+                                        <p className="text-sm text-[--color-text-secondary] mb-2 font-medium">Categories</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {freelancer.categories.map((category, index) => (
+                                                <Badge key={index} className="bg-[--color-primary]/20 text-[--color-primary]">
+                                                    {category}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-[--color-text-secondary] mb-2 font-medium">Skills</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {freelancer.skills.map((skill, index) => (
+                                                <Badge
+                                                    key={index}
+                                                    variant="outline"
+                                                    className="!text-[--color-text-secondary]"
+                                                >
+                                                    {skill}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                </CardContent>
+                            </Card>
+
+                            {/* Portfolio */}
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle>Portfolio ({filteredPortfolio.length})</CardTitle>
+                                        <div className="relative w-64">
+                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[--color-text-secondary] w-4 h-4" />
+                                            <Input
+                                                type="text"
+                                                placeholder="Search portfolio..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                className="pl-10"
+                                            />
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    {filteredPortfolio.length === 0 ? (
+                                        <div className="text-center py-12">
+                                            <Target className="w-16 h-16 text-[--color-text-secondary] mx-auto mb-4" />
+                                            <p className="text-[--color-text-secondary]">
+                                                {searchQuery ? 'No portfolio items match your search' : 'No portfolio items yet'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {filteredPortfolio.map((item) => (
+                                                <motion.div
+                                                    key={item.id}
+                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    className="border border-[--color-border] rounded-xl overflow-hidden hover:shadow-lg transition-all"
+                                                >
+                                                    {/* Image */}
+                                                    <div className="aspect-video bg-[--color-bg-secondary] overflow-hidden">
+                                                        {item.image ? (
+                                                            <img
+                                                                src={item.image}
+                                                                alt={item.title}
+                                                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center">
+                                                                <Briefcase className="w-12 h-12 text-[--color-text-secondary]" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {/* Content */}
+                                                    <div className="p-4">
+                                                        <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+                                                        <p className="text-sm text-[--color-text-secondary] mb-3 line-clamp-2">
+                                                            {item.description}
+                                                        </p>
+                                                        {item.link && (
+                                                            <a
+                                                                href={item.link}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-1 text-[--color-primary] hover:underline text-sm"
+                                                            >
+                                                                View Project <ExternalLink className="w-3 h-3" />
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Reviews Section */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Client Reviews</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <ReviewsList
+                                        freelancerId={freelancer.userId}
+                                        maxReviews={5}
+                                        showLoadMore={true}
+                                        className=""
+                                    />
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Right Column - Contact & Additional Info */}
+                        <div className="space-y-6">
+                            {/* Contact Information */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Contact Information</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <Mail className="w-5 h-5 text-[--color-primary]" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm text-[--color-text-secondary]">Email</p>
+                                            <p className="font-medium truncate">{freelancer.userEmail}</p>
+                                        </div>
+                                    </div>
+                                    {isOwner && (
+                                        <div className="flex items-center gap-3">
+                                            <User className="w-5 h-5 text-[--color-primary]" />
+                                            <div>
+                                                <p className="text-sm text-[--color-text-secondary]">User ID</p>
+                                                <p className="font-medium font-mono text-xs">{freelancer.userId.substring(0, 20)}...</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Rates & Availability */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Rates & Availability</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-center justify-between p-3 bg-[--color-bg-secondary] rounded-lg">
+                                        <div className="flex items-center gap-2">
+                                            <DollarSign className="w-5 h-5 text-green-500" />
+                                            <span className="text-sm text-[--color-text-secondary]">Hourly Rate</span>
+                                        </div>
+                                        <span className="font-bold text-lg">{freelancer.currency} {freelancer.hourlyRate}/hr</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <Clock className="w-5 h-5 text-[--color-primary]" />
+                                        <div>
+                                            <p className="text-sm text-[--color-text-secondary]">Availability</p>
+                                            <p className="font-medium">{freelancer.availability}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <Calendar className="w-5 h-5 text-[--color-primary]" />
+                                        <div>
+                                            <p className="text-sm text-[--color-text-secondary]">Approved On</p>
+                                            <p className="font-medium">
+                                                {freelancer.approvedAt?.toDate().toLocaleDateString('en-US', {
+                                                    year: 'numeric',
+                                                    month: 'short',
+                                                    day: 'numeric'
+                                                })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Languages */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Languages</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex flex-wrap gap-2">
+                                        {freelancer.languages.map((language, index) => (
+                                            <Badge
+                                                key={index}
+                                                variant="outline"
+                                                className="flex items-center gap-1 !text-[--color-text-secondary]"
+                                            >
+                                                <Globe className="w-3 h-3" />
+                                                {language}
+                                            </Badge>
+                                        ))}
+                                    </div>
+
+                                </CardContent>
+                            </Card>
+
+                            {/* Education */}
+                            {freelancer.education && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Education</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-[--color-text-primary]">{freelancer.education}</p>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Certifications */}
+                            {freelancer.certifications.length > 0 && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Certifications</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <ul className="space-y-2">
+                                            {freelancer.certifications.map((cert, index) => (
+                                                <li key={index} className="flex items-start gap-2">
+                                                    <Award className="w-4 h-4 text-[--color-primary] mt-1 flex-shrink-0" />
+                                                    <span className="text-sm">{cert}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+        </div>
+    );
+};
+
+export default GigDetailPage;

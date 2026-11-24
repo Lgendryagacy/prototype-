@@ -1,0 +1,135 @@
+
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Card, CardContent } from './ui/Card';
+import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
+import { DollarSign, Clock, MessageSquare, Bookmark, MapPin, Briefcase, Building2 } from 'lucide-react';
+import { type Route } from '../types';
+
+interface PhysicalJobCardProps {
+    job: any;
+    navigate: (route: Route, context?: any) => void;
+}
+
+const StatusBadge = ({ status }: { status: string }) => {
+    let variant: 'success' | 'warning' | 'destructive' | 'secondary' = 'secondary';
+    if (status === 'Active') variant = 'success';
+    if (status === 'Pending') variant = 'warning';
+    if (status === 'Hired' || status === 'Closed') variant = 'destructive';
+    
+    return <Badge variant={variant}>{status}</Badge>;
+};
+
+export const PhysicalJobCard = ({ job, navigate }: PhysicalJobCardProps) => {
+    const [isSaved, setIsSaved] = useState(false);
+    const isOnSiteJob = !!job.companyName;
+    const companyName = isOnSiteJob ? job.companyName : job.client;
+    const location = isOnSiteJob ? `${job.city}, ${job.country}` : job.location;
+
+    const postedDate = job.postedDate ? new Date(job.postedDate) : null;
+    let postedText = job.posted;
+    if (postedDate) {
+        const timeAgo = Math.round((new Date().getTime() - postedDate.getTime()) / (1000 * 3600 * 24));
+        if (timeAgo <= 0) postedText = 'today';
+        else if (timeAgo === 1) postedText = '1 day ago';
+        else postedText = `${timeAgo} days ago`;
+    }
+    
+    // Generate initials for logo placeholder if logoUrl is missing
+    const initials = companyName ? companyName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : 'JP';
+
+    return (
+        <motion.div whileHover={{ y: -2 }}>
+            <Card className={`hover:border-[--color-primary]/50 transition-colors ${job.status === 'Hired' ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`} onClick={job.status === 'Hired' ? undefined : () => navigate('gig-detail', job.id)}>
+                <CardContent className="p-6 pt-2   ">
+                    <div className="flex flex-col md:flex-row gap-6">
+                        {/* Company Logo / Placeholder */}
+                        <div className="flex-shrink-0">
+                            <div className="w-16 h-16 rounded-xl bg-[--color-bg-tertiary] flex items-center justify-center text-xl font-bold text-[--color-text-secondary] border border-[--color-border]">
+                                {initials}
+                            </div>
+                        </div>
+
+                        {/* Main Content */}
+                        <div className="flex-1">
+                            <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                                <div>
+                                    <h3 className="font-bold text-xl hover:text-[--color-primary] mb-2">{job.title}</h3>
+                                    <div className="flex items-center flex-wrap gap-3 text-sm text-[--color-text-secondary]">
+                                        <span className="font-medium flex items-center gap-1.5 text-[--color-text-primary]">
+                                            <Building2 size={14} /> {companyName}
+                                        </span>
+                                        <span className="hidden sm:inline text-[--color-border]">|</span>
+                                        <span className="flex items-center gap-1.5">
+                                            <MapPin size={14} /> {location}
+                                        </span>
+                                        {isOnSiteJob && job.status && (
+                                            <>
+                                                <span className="hidden sm:inline text-[--color-border]">|</span>
+                                                <StatusBadge status={job.status} />
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {/* Apply Button - Always Visible */}
+                                <div className="flex-shrink-0 flex gap-2 sm:self-start mt-2 sm:mt-0 w-full sm:w-auto">
+                                     <Button variant="outline" size="icon" className="flex-shrink-0" onClick={(e) => { e.stopPropagation(); setIsSaved(!isSaved); }}>
+                                       <Bookmark size={18} fill={isSaved ? 'currentColor' : 'none'} className={isSaved ? 'text-[--color-primary]' : 'text-[--color-text-secondary]'}/>
+                                   </Button>
+                                   <Button className="w-full sm:w-auto whitespace-nowrap" onClick={(e) => { e.stopPropagation(); navigate(isOnSiteJob ? 'gig-detail' : 'submit-proposal', job.id); }}>
+                                       Apply Now
+                                   </Button>
+                                </div>
+                            </div>
+
+                            {/* Job Specific Details */}
+                            <div className="mt-4 flex flex-wrap gap-4 text-sm text-[--color-text-secondary]">
+                                {isOnSiteJob ? (
+                                    <>
+                                        <span className="flex items-center gap-1.5 bg-[--color-bg-secondary] px-3 py-1 rounded-full">
+                                            <DollarSign size={14} /> {job.salaryRange}
+                                        </span>
+                                        <span className="flex items-center gap-1.5 bg-[--color-bg-secondary] px-3 py-1 rounded-full">
+                                            <Clock size={14} /> {job.jobType}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="flex items-center gap-1.5 bg-[--color-bg-secondary] px-3 py-1 rounded-full">
+                                            <DollarSign size={14} /> {typeof job.budget === 'number' ? `$${job.budget.toLocaleString()}` : job.budget} ({job.type})
+                                        </span>
+                                        <span className="flex items-center gap-1.5 bg-[--color-bg-secondary] px-3 py-1 rounded-full">
+                                            <Clock size={14} /> Est. {job.duration}
+                                        </span>
+                                        <span className="flex items-center gap-1.5 bg-[--color-bg-secondary] px-3 py-1 rounded-full">
+                                            <MessageSquare size={14}/> {job.proposals} proposals
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Skills */}
+                            <div className="flex flex-wrap gap-2 mt-4">
+                                {job.skills.slice(0, 5).map((skill: string) => (
+                                    <Badge key={skill} variant="secondary" className="text-xs font-normal">
+                                        {skill}
+                                    </Badge>
+                                ))}
+                                {job.skills.length > 5 && (
+                                    <span className="text-xs text-[--color-text-secondary] self-center">+{job.skills.length - 5} more</span>
+                                )}
+                            </div>
+                            
+                            <div className="mt-4 pt-4 border-t border-[--color-border] flex justify-between items-center text-xs text-[--color-text-secondary]">
+                                <span>Posted {postedText}</span>
+                                <span>{job.experienceLevel} Level</span>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </motion.div>
+    );
+};

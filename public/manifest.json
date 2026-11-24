@@ -1,0 +1,76 @@
+{
+  "name": "FOGSLY - Freelance & Services Platform",
+  "short_name": "FOGSLY",
+  "description": "Connect with top freelancers and find quality services on FOGSLY",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/images/main-logo/fogsly.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/main-logo/fogsly.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/main-logo/fogsly.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/images/main-logo/fogsly.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "social"],
+  "shortcuts": [
+    {
+      "name": "Find Services",
+      "short_name": "Services",
+      "description": "Browse available services",
+      "url": "/fog-services",
+      "icons": [
+        {
+          "src": "/images/main-logo/fogsly.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Find Work",
+      "short_name": "Work",
+      "description": "Browse available jobs",
+      "url": "/find-work",
+      "icons": [
+        {
+          "src": "/images/main-logo/fogsly.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Go to your dashboard",
+      "url": "/dashboard",
+      "icons": [
+        {
+          "src": "/images/main-logo/fogsly.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" fill="none">
+    
+    <defs>
+      <!-- Ground Ambient Shadows -->
+      <radialGradient id="ambFloorShadow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#020617" stop-opacity="0.38" />
+        <stop offset="45%" stop-color="#090D1A" stop-opacity="0.18" />
+        <stop offset="75%" stop-color="#0F172A" stop-opacity="0.05" />
+        <stop offset="100%" stop-color="#0F172A" stop-opacity="0" />
+      </radialGradient>
+
+      <!-- Glass Highlight -->
+      <linearGradient id="glassGloss" x1="0%" y1="0%" x2="70%" y2="100%">
+        <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.65" />
+        <stop offset="35%" stop-color="#FFFFFF" stop-opacity="0.25" />
+        <stop offset="70%" stop-color="#FFFFFF" stop-opacity="0.05" />
+        <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+      </linearGradient>
+
+      <!-- Gold 3D Material -->
+      <linearGradient id="goldLight" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#FFFBEB" />
+        <stop offset="20%" stop-color="#FDE047" />
+        <stop offset="50%" stop-color="#EAB308" />
+        <stop offset="85%" stop-color="#CA8A04" />
+        <stop offset="100%" stop-color="#854D0E" />
+      </linearGradient>
+
+      <linearGradient id="goldEdge" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#713F12" />
+        <stop offset="40%" stop-color="#A16207" />
+        <stop offset="70%" stop-color="#EAB308" />
+        <stop offset="100%" stop-color="#FEF08A" />
+      </linearGradient>
+
+      <!-- Royal Blue 3D Material -->
+      <linearGradient id="blue3dGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+        <stop offset="0%" stop-color="#60A5FA" />
+        <stop offset="30%" stop-color="#2563EB" />
+        <stop offset="70%" stop-color="#1D4ED8" />
+        <stop offset="100%" stop-color="#0F2870" />
+      </linearGradient>
+
+      <!-- Deep Purple 3D Material -->
+      <linearGradient id="purple3dGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+        <stop offset="0%" stop-color="#C084FC" />
+        <stop offset="30%" stop-color="#8B5CF6" />
+        <stop offset="70%" stop-color="#6D28D9" />
+        <stop offset="100%" stop-color="#3B0764" />
+      </linearGradient>
+
+      <!-- Emerald 3D Material -->
+      <linearGradient id="emerald3dGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+        <stop offset="0%" stop-color="#6EE7B7" />
+        <stop offset="35%" stop-color="#10B981" />
+        <stop offset="75%" stop-color="#047857" />
+        <stop offset="100%" stop-color="#064E3B" />
+      </linearGradient>
+
+      <!-- Platinum / Chrome Material -->
+      <linearGradient id="chrome3d" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#FFFFFF" />
+        <stop offset="30%" stop-color="#E2E8F0" />
+        <stop offset="60%" stop-color="#94A3B8" />
+        <stop offset="85%" stop-color="#CBD5E1" />
+        <stop offset="100%" stop-color="#475569" />
+      </linearGradient>
+
+      <!-- Soft Drop Shadow Filter -->
+      <filter id="soft3dShadow" x="-20%" y="-20%" width="150%" height="150%">
+        <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#0F172A" flood-opacity="0.25" />
+        <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#0F172A" flood-opacity="0.15" />
+      </filter>
+
+      <!-- Glowing Filter for Accents -->
+      <filter id="glowGleam" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+  
+
+    <!-- Ambient Shadow -->
+    <ellipse cx="256" cy="445" rx="180" ry="32" fill="url(#ambFloorShadow)" />
+
+    <!-- Floating Background Light Burst Stars -->
+    <g transform="translate(390, 110) scale(1.2)" filter="url(#glowGleam)">
+      <path d="M0 -24 C0 -6 6 0 24 0 C6 0 0 6 0 24 C0 6 -6 0 -24 0 C-6 0 0 -6 0 -24 Z" fill="url(#goldLight)" />
+      <circle cx="0" cy="0" r="5" fill="#FFFFFF" />
+    </g>
+    <g transform="translate(85, 230) scale(0.8)" filter="url(#glowGleam)">
+      <path d="M0 -20 C0 -5 5 0 20 0 C5 0 0 5 0 20 C0 5 -5 0 -20 0 C-5 0 0 -5 0 -20 Z" fill="#6EE7B7" />
+    </g>
+
+    <!-- Left Smaller Floating 3D Gold Coin -->
+    <g transform="translate(90, 310) rotate(-22) scale(0.55)" filter="url(#soft3dShadow)">
+      <!-- Coin Rim Depth -->
+      <ellipse cx="0" cy="18" rx="80" ry="70" fill="url(#goldEdge)" />
+      <ellipse cx="0" cy="0" rx="80" ry="70" fill="url(#goldLight)" stroke="#FEF08A" stroke-width="4" />
+      <ellipse cx="0" cy="0" rx="60" ry="52" fill="#15803D" stroke="#FEF08A" stroke-width="3" />
+      <text x="0" y="20" font-family="system-ui, sans-serif" font-size="56" font-weight="900" fill="url(#goldLight)" text-anchor="middle">F</text>
+    </g>
+
+    <!-- Right Smaller Floating 3D Gold Coin -->
+    <g transform="translate(425, 260) rotate(18) scale(0.65)" filter="url(#soft3dShadow)">
+      <ellipse cx="0" cy="20" rx="80" ry="70" fill="url(#goldEdge)" />
+      <ellipse cx="0" cy="0" rx="80" ry="70" fill="url(#goldLight)" stroke="#FEF08A" stroke-width="4" />
+      <ellipse cx="0" cy="0" rx="60" ry="52" fill="#1D4ED8" stroke="#FEF08A" stroke-width="3" />
+      <text x="0" y="20" font-family="system-ui, sans-serif" font-size="56" font-weight="900" fill="url(#goldLight)" text-anchor="middle">F</text>
+    </g>
+
+    <!-- Main Giant 3D FOG Coin -->
+    <g transform="translate(256, 235)" filter="url(#soft3dShadow)">
+      <!-- 3D Extrusion Cylinder Rim (Bottom Side) -->
+      <path d="M-175 0 C-175 96.6 78.4 175 175 175 C271.6 175 350 96.6 350 0 L350 42 C350 138.6 271.6 217 175 217 C78.4 217 -175 138.6 -175 42 Z" transform="translate(-87.5, 0)" fill="url(#goldEdge)" />
+      
+      <!-- Coin Edge Milled Ridges simulation -->
+      <path d="M-150 30 L-150 72 M-110 52 L-110 94 M-60 70 L-60 112 M0 80 L0 122 M60 70 L60 112 M110 52 L110 94 M150 30 L150 72" stroke="#713F12" stroke-width="4" stroke-linecap="round" opacity="0.5" />
+
+      <!-- Coin Front Beveled Outer Rim -->
+      <circle cx="0" cy="0" r="175" fill="url(#goldLight)" stroke="#FFFBEB" stroke-width="5" />
+      <circle cx="0" cy="0" r="162" fill="none" stroke="#A16207" stroke-width="3" />
+
+      <!-- Coin Stepped Recessed Ring -->
+      <circle cx="0" cy="0" r="150" fill="url(#goldEdge)" />
+      
+      <!-- Micro Beaded Ring around Circumference -->
+      <circle cx="0" cy="0" r="138" stroke="#FFFBEB" stroke-width="3" stroke-dasharray="4 8" fill="none" opacity="0.85" />
+
+      <!-- Inner Jewel Medallion (Iridescent Emerald & Sapphire Gradient) -->
+      <radialGradient id="jewelInner" cx="35%" cy="30%" r="70%">
+        <stop offset="0%" stop-color="#34D399" />
+        <stop offset="35%" stop-color="#059669" />
+        <stop offset="70%" stop-color="#065F46" />
+        <stop offset="100%" stop-color="#022C22" />
+      </radialGradient>
+      <circle cx="0" cy="0" r="126" fill="url(#jewelInner)" stroke="url(#goldLight)" stroke-width="6" />
+
+      <!-- Medallion Specular Glaze Arc -->
+      <path d="M-90 -60 C-40 -115 40 -115 90 -60 C40 -85 -40 -85 -90 -60 Z" fill="#FFFFFF" opacity="0.55" />
+
+      <!-- Center Iconic 3D "F" Emblem with Bevel & Drop Shadow -->
+      <g filter="url(#glowGleam)">
+        <!-- Shadow of F -->
+        <path d="M-42 62 L-42 -58 L38 -58 L38 -22 L-6 -22 L-6 -2 L28 -2 L28 28 L-6 28 L-6 62 Z" fill="#022C22" opacity="0.6" transform="translate(4, 6)" />
+        <!-- Front Gold 3D F -->
+        <path d="M-42 60 L-42 -60 L40 -60 L40 -24 L-4 -24 L-4 -4 L30 -4 L30 26 L-4 26 L-4 60 Z" fill="url(#goldLight)" stroke="#FFFBEB" stroke-width="4" stroke-linejoin="round" />
+        <!-- Inner Facet Highlights on F -->
+        <path d="M-40 -58 L-40 58 L-6 58 L-6 24 L28 24 L28 -2 L-6 -2 L-6 -26 L38 -26 L38 -58 Z" stroke="#FEF08A" stroke-width="2" fill="none" />
+      </g>
+
+      <!-- Corner Sparkling Jewel Accents -->
+      <circle cx="-85" cy="0" r="5" fill="url(#goldLight)" stroke="#FFFFFF" stroke-width="1.5" />
+      <circle cx="85" cy="0" r="5" fill="url(#goldLight)" stroke="#FFFFFF" stroke-width="1.5" />
+      <circle cx="0" cy="-85" r="5" fill="url(#goldLight)" stroke="#FFFFFF" stroke-width="1.5" />
+      <circle cx="0" cy="85" r="5" fill="url(#goldLight)" stroke="#FFFFFF" stroke-width="1.5" />
+    </g>
+  </svg>
+  

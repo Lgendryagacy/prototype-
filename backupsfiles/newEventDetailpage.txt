@@ -1,0 +1,1090 @@
+
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ArrowLeft, Calendar, MapPin, Globe, Clock, Plus, Search, Filter,
+  ChevronRight, ArrowUpRight, MoreHorizontal, CheckCircle2,
+  Users, Share2, Star, LayoutGrid, Ticket, MonitorPlay,
+  Heart, ExternalLink, Copy, X, ChevronDown, Wallet,
+  BarChart3, Sparkles, Zap, TrendingUp, Rocket,
+  QrCode, AlertCircle, Loader2, Download, Send, Play, Info, Store, Check
+} from 'lucide-react';
+import { Button } from '../components/ui/Button';
+import { type Route } from '../types';
+import { EventType, EventStatus, Event } from '../constants';
+import { getActiveEventById, getAllActiveEvents } from '../firebase/services/activeEventService';
+import { createEventTicket, checkUserHasTicket, getUserEventTicket } from '../firebase/services/eventTicketService';
+import { getUserProfile } from '../firebase/services/userService';
+import { updateUserFogCoins } from '../firebase/services/walletService';
+import type { vent } from '../firebase/types/activeEvent';
+import type { User } from '../firebase/types/user';
+import type { EventTicket } from '../firebase/types/eventTicket';
+
+// --- Sub-Components ---
+
+const StatusBadge = ({ status }: { status: EventStatus }) => {
+  const styles = {
+    draft: "bg-slate-100 text-slate-500 border-slate-200",
+    pending: "bg-amber-50 text-amber-600 border-amber-200",
+    coming_soon: "bg-blue-50 text-blue-600 border-blue-200",
+    live: "bg-gradient-to-r from-red-500 to-rose-600 text-white border-red-500/50 shadow-lg shadow-red-500/30 animate-pulse",
+    completed: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    expired: "bg-slate-100 text-slate-400 border-slate-200",
+    cancelled: "bg-slate-50 text-slate-400 border-slate-100 decoration-line-through",
+  };
+
+  const labels = {
+    draft: "Draft",
+    pending: "Under Review",
+    coming_soon: "Coming Soon",
+    live: "● LIVE NOW",
+    completed: "Completed",
+    expired: "Past Event",
+    cancelled: "Cancelled"
+  };
+
+  return (
+    <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1.5 ${styles[status]}`}>
+      {labels[status]}
+    </span>
+  );
+};
+
+const VirtualTicket = ({ event, attendeeName, ticketId, virtualLink }: { event: Event, attendeeName: string, ticketId: string, virtualLink?: string }) => {
+  const ticketRef = React.useRef<HTMLDivElement>(null);
+
+  const downloadTicket = async () => {
+    if (!ticketRef.current) return;
+
+    try {
+      // Dynamic import to avoid loading html2canvas on initial page load
+      const html2canvas = (await import('html2canvas')).default;
+
+      const canvas = await html2canvas(ticketRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false,
+        useCORS: true
+      });
+
+      // Convert canvas to blob and download
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = `fogsly-ticket-${ticketId}.png`;
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+        }
+      });
+    } catch (error) {
+      console.error('Error downloading ticket:', error);
+      alert('Failed to download ticket. Please try again.');
+    }
+  };
+
+  return (
+    <div>
+      <motion.div
+        ref={ticketRef}
+        initial={{ opacity: 0, scale: 0.9, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="w-full bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mt-6"
+      >
+        {/* Ticket Header - Dark with Image */}
+        <div className="relative h-32 bg-slate-900 overflow-hidden group">
+          <img src={event.banner} className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-700" alt="banner" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent"></div>
+
+          <div className="absolute top-4 left-4">
+            <span className="bg-teal-500 text-white text-[10px] font-extrabold px-3 py-1 rounded shadow-lg uppercase tracking-wider">
+              {event.type} Pass
+            </span>
+          </div>
+
+          {/* FOGSLY Branding - Top Right */}
+          <div className="absolute top-4 right-4">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-lg">
+              <p className="text-white font-extrabold text-xs tracking-wider">FOGSLY</p>
+            </div>
+          </div>
+
+          <div className="absolute bottom-4 left-4 right-4">
+            <h3 className="text-white font-bold text-lg leading-tight line-clamp-2 drop-shadow-md">{event.title}</h3>
+          </div>
+        </div>
+
+        {/* Ticket Body */}
+        <div className="p-5 relative">
+          {/* Perforation visual */}
+          <div className="absolute -top-3 left-0 w-full h-6 flex items-center justify-between px-1 z-10">
+            {[...Array(20)].map((_, i) => <div key={i} className="w-2 h-1 bg-white rounded-full mx-0.5"></div>)}
+          </div>
+          <div className="absolute top-[-12px] left-[-12px] w-6 h-6 bg-white border-b border-r border-slate-100 rounded-full z-10"></div>
+          <div className="absolute top-[-12px] right-[-12px] w-6 h-6 bg-white border-b border-l border-slate-100 rounded-full z-10"></div>
+
+
+          <div className="flex justify-between items-start mb-6 mt-2">
+            <div>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Date</p>
+              <p className="text-sm font-bold text-slate-900">{event.startDate}</p>
+              <p className="text-[10px] text-slate-500">{event.startTime}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Type</p>
+              <p className="text-sm font-bold text-teal-600">{event.type === 'virtual' ? 'Online' : 'Physical'}</p>
+            </div>
+          </div>
+
+          {/* Attendee Info */}
+          <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-1">Attendee</p>
+            <p className="font-bold text-slate-900 text-sm truncate">{attendeeName}</p>
+            <p className="text-[9px] text-slate-400 font-mono mt-0.5 uppercase">ID: #{ticketId.slice(0, 8)}</p>
+          </div>
+        </div>
+
+        {/* Verified Entry Strip */}
+        <div className="bg-teal-600 py-3 text-center cursor-default">
+          <p className="text-white text-[10px] font-extrabold uppercase tracking-[0.2em] flex items-center justify-center gap-2">
+            <CheckCircle2 size={12} strokeWidth={3} /> Verified Entry
+          </p>
+        </div>
+
+        {/* FOGSLY Footer Branding */}
+        <div className="bg-slate-50 py-2 px-4 border-t border-slate-100">
+          <div className="flex items-center justify-center gap-2">
+            <Ticket size={12} className="text-slate-400" />
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
+              Powered by FOGSLY
+            </p>
+          </div>
+        </div>
+
+        {/* Virtual Event Link - Show below ticket */}
+        {event.type === 'virtual' && virtualLink && (
+          <div className="bg-gradient-to-r from-teal-50 to-blue-50 p-5 border-t border-slate-100">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-teal-500 flex items-center justify-center shrink-0">
+                <MonitorPlay size={20} className="text-white" />
+              </div>
+              <div className="flex-grow">
+                <p className="text-xs font-bold text-slate-900 mb-1">Virtual Event Link</p>
+                <p className="text-[10px] text-slate-500 mb-3">Join the event using this link (active 15 mins before start)</p>
+                <div className="bg-white rounded-lg p-2 border border-slate-200 flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={virtualLink}
+                    className="flex-grow text-xs text-slate-600 bg-transparent outline-none font-mono"
+                  />
+                  <button
+                    onClick={() => navigator.clipboard.writeText(virtualLink)}
+                    className="px-3 py-1.5 bg-teal-500 hover:bg-teal-600 text-white text-[10px] font-bold rounded-md transition-colors flex items-center gap-1"
+                  >
+                    <Copy size={10} /> Copy
+                  </button>
+                </div>
+                <a
+                  href={virtualLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-teal-600/20"
+                >
+                  <Play size={14} /> Join Virtual Event
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Download Button */}
+      <button
+        onClick={downloadTicket}
+        className="w-full mt-4 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg"
+      >
+        <Download size={16} /> Download Ticket
+      </button>
+    </div>
+  );
+};
+
+const ShareModal = ({ isOpen, onClose, event, slug }: { isOpen: boolean, onClose: () => void, event: Event, slug: string }) => {
+  if (!isOpen) return null;
+
+  const shareUrl = `${window.location.origin}/event/${slug}`;
+
+  return (
+    <>
+      {/* Portal-like rendering at root level */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          overflowY: 'auto',
+          padding: '1rem'
+        }}
+        onClick={onClose}
+      >
+        {/* Backdrop */}
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 1
+          }}
+        />
+        
+        {/* Modal Content - Now at TOP */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.2 }}
+          style={{
+            position: 'relative',
+            zIndex: 10,
+            width: '100%',
+            maxWidth: '28rem',
+            margin: '2rem auto'
+          }}
+          className="bg-[var(--color-card)] rounded-3xl p-6 shadow-2xl border border-[var(--color-border)]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-bold text-[var(--color-text-primary)]">Share Event</h3>
+            <button 
+              onClick={onClose} 
+              className="p-2 hover:bg-[var(--color-bg-secondary)] rounded-full transition-colors text-[var(--color-text-secondary)]"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="bg-[var(--color-bg-secondary)] p-4 rounded-2xl flex gap-4 mb-6 border border-[var(--color-border)]">
+            <img src={event.banner} className="w-16 h-16 rounded-xl object-cover flex-shrink-0" alt="thumb" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-[var(--color-text-primary)] line-clamp-2 text-sm mb-1">{event.title}</p>
+              <p className="text-xs text-[var(--color-text-secondary)] font-bold">{event.startDate} • {event.type}</p>
+            </div>
+          </div>
+
+          <div className="bg-[var(--color-bg-secondary)] p-3 rounded-xl flex items-center gap-3 mb-6 border border-[var(--color-border)] focus-within:border-[var(--color-primary)] transition-colors">
+            <input 
+              type="text" 
+              readOnly 
+              value={shareUrl} 
+              className="bg-transparent flex-grow text-sm outline-none text-[var(--color-text-primary)] font-medium min-w-0" 
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(shareUrl);
+              }}
+              className="text-[var(--color-primary)] font-bold text-sm hover:text-[var(--color-accent)] flex items-center gap-1.5 bg-[var(--color-primary)]/10 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+            >
+              <Copy size={14} /> Copy
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="outline" className="w-full">Facebook</Button>
+            <Button variant="outline" className="w-full">Twitter</Button>
+          </div>
+        </motion.div>
+      </div>
+    </>
+  );
+};
+
+// --- EventDetail Component ---
+
+const EventDetail = ({
+  navigate,
+  context: slug,
+  currentUser,
+  isLoggedIn
+}: {
+  navigate: (route: Route, context?: any) => void,
+  context?: any,
+  currentUser?: User | null,
+  isLoggedIn?: boolean
+}) => {
+  // Parse slug to extract event ID (last segment after last hyphen)
+  const eventId = slug ? slug.split('-').pop() : '';
+
+  const [event, setEvent] = useState<Event | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showShare, setShowShare] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch event data
+  useEffect(() => {
+    const fetchEvent = async () => {
+      if (!eventId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        console.log('Fetching event with ID:', eventId);
+
+        const activeEvent = await getActiveEventById(eventId);
+
+        if (activeEvent) {
+          console.log('Event found:', activeEvent);
+          // Transform ActiveEvent to Event interface
+          const transformedEvent: Event = {
+            id: activeEvent.id || '',
+            title: activeEvent.title,
+            description: activeEvent.description,
+            banner: activeEvent.banner || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000',
+            type: activeEvent.type,
+            category: activeEvent.category,
+            status: 'live' as EventStatus,
+            startDate: activeEvent.startDate,
+            endDate: activeEvent.endDate,
+            startTime: activeEvent.startTime,
+            city: activeEvent.city,
+            country: activeEvent.country,
+            address: activeEvent.address,
+            virtualLink: activeEvent.type === 'virtual' ? 'https://meet.fogsly.com/event' : undefined,
+            organizerName: activeEvent.organizerName,
+            organizerId: activeEvent.organizerId || '',
+            organizerAvatar: activeEvent.organizerProfile || 'https://i.pravatar.cc/150?img=1',
+            price: activeEvent.isFree ? 'Free' : `${activeEvent.priceInFOG} FOG`,
+            attendees: activeEvent.currentAttendees || 0,
+            maxCapacity: parseInt(activeEvent.maxCapacity) || 0,
+            isFeatured: false,
+            tags: activeEvent.tags || []
+          };
+          setEvent(transformedEvent);
+        } else {
+          console.log('Event not found');
+          setError('Event not found');
+        }
+      } catch (error) {
+        console.error('Error fetching event:', error);
+        setError('Failed to load event. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEvent();
+
+    // Auto-sync every minute to update ticket counts and event status
+    const syncInterval = setInterval(() => {
+      console.log('🔄 Auto-syncing event data...');
+      fetchEvent();
+    }, 60000); // 60 seconds = 1 minute
+
+    return () => clearInterval(syncInterval);
+  }, [eventId]);
+
+  // Fetch user balance from userEarnings
+  const [userBalance, setUserBalance] = useState(0);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(true);
+
+  useEffect(() => {
+    const fetchUserBalance = async () => {
+      if (!currentUser?.uid) {
+        setIsLoadingBalance(false);
+        return;
+      }
+
+      try {
+        // Fetch from userEarnings collection, not Users collection
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        const { db } = await import('../firebase/config');
+
+        const earningsQuery = query(
+          collection(db, 'userEarnings'),
+          where('userId', '==', currentUser.uid)
+        );
+        const earningsSnapshot = await getDocs(earningsQuery);
+
+        if (!earningsSnapshot.empty) {
+          const earningsData = earningsSnapshot.docs[0].data();
+          // Get balance from userEarnings.availableBalance
+          setUserBalance(earningsData.availableBalance || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching user balance:', error);
+      } finally {
+        setIsLoadingBalance(false);
+      }
+    };
+
+    fetchUserBalance();
+  }, [currentUser?.uid]);
+
+  // Check if user already has a ticket for this event
+  useEffect(() => {
+    const checkExistingTicket = async () => {
+      if (!currentUser?.uid || !eventId) {
+        setIsCheckingTicket(false);
+        return;
+      }
+
+      try {
+        setIsCheckingTicket(true);
+        const existingTicket = await getUserEventTicket(currentUser.uid, eventId);
+
+        if (existingTicket) {
+          setIsPurchased(true);
+          setTicket(existingTicket);
+          console.log('✅ User already has ticket:', existingTicket.ticketId);
+        }
+      } catch (error) {
+        console.error('Error checking existing ticket:', error);
+      } finally {
+        setIsCheckingTicket(false);
+      }
+    };
+
+    checkExistingTicket();
+  }, [currentUser?.uid, eventId]);
+
+  const [isMapLoading, setIsMapLoading] = useState(true);
+  const [isCheckingTicket, setIsCheckingTicket] = useState(true);
+
+  // Purchase States
+  const [isPurchased, setIsPurchased] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [ticket, setTicket] = useState<EventTicket | null>(null);
+
+  const [suggestedEvents, setSuggestedEvents] = useState<Event[]>([]);
+
+  // Fetch suggested events
+  useEffect(() => {
+    const fetchSuggested = async () => {
+      try {
+        const activeEvents = await getAllActiveEvents();
+        const transformed = activeEvents
+          .filter(ae => ae.eventStatus === 'active' && ae.id !== eventId)
+          .slice(0, 3)
+          .map(ae => ({
+            id: ae.id || '',
+            title: ae.title,
+            description: ae.description,
+            banner: ae.banner || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000',
+            type: ae.type,
+            category: ae.category,
+            status: 'live' as EventStatus,
+            startDate: ae.startDate,
+            endDate: ae.endDate,
+            startTime: ae.startTime,
+            city: ae.city,
+            country: ae.country,
+            address: ae.address,
+            virtualLink: ae.type === 'virtual' ? 'https://meet.fogsly.com/event' : undefined,
+            organizerName: ae.organizerName,
+            organizerId: ae.organizerId || '',
+            organizerAvatar: ae.organizerProfile || 'https://i.pravatar.cc/150?img=1',
+            price: ae.isFree ? 'Free' : `${ae.priceInFOG} FOG`,
+            attendees: ae.currentAttendees || 0,
+            maxCapacity: parseInt(ae.maxCapacity) || 0,
+            isFeatured: false,
+            tags: ae.tags || []
+          }));
+        setSuggestedEvents(transformed);
+      } catch (error) {
+        console.error('Error fetching suggested events:', error);
+        setSuggestedEvents([]);
+      }
+    };
+
+    if (eventId) {
+      fetchSuggested();
+    }
+  }, [eventId]);
+
+  // Check if current user is the event organizer
+  const isEventOrganizer = currentUser?.uid === event?.organizerId;
+
+  // Check if event has started (compare current date/time with event start)
+  // Applies to BOTH virtual and physical events - booking stops when event starts
+  const hasEventStarted = () => {
+    if (!event) return false;
+
+    try {
+      const eventDate = new Date(event.startDate + ' ' + event.startTime);
+      const now = new Date();
+      return now >= eventDate;
+    } catch {
+      return false;
+    }
+  };
+
+  // Check if all tickets are sold out
+  const isSoldOut = event?.attendees >= event?.maxCapacity;
+
+  const handleSave = () => setIsSaved(!isSaved);
+
+  const handlePurchase = async () => {
+    if (!currentUser || !event) {
+      setPurchaseError('Please log in to purchase tickets');
+      return;
+    }
+
+    setPurchaseError(null);
+    setIsProcessing(true);
+
+    try {
+      // Get user profile for complete attendee info
+      const userProfile = await getUserProfile(currentUser.uid);
+
+      if (!userProfile) {
+        throw new Error('User profile not found');
+      }
+
+      // Extract numeric price
+      const cost = event.price === 'Free' ? 0 : parseFloat(event.price.replace(/[^0-9.]/g, ''));
+
+      // Check if user has sufficient balance for paid events
+      // Balance comes from userEarnings.availableBalance
+      if (cost > 0) {
+        if (userBalance < cost) {
+          setPurchaseError(`Insufficient FOG coins. You need ${(cost - userBalance).toFixed(2)} more FOG.`);
+          setIsProcessing(false);
+          return;
+        }
+      }
+
+      // Create ticket with complete attendee data
+      const ticketId = await createEventTicket({
+        eventId: event.id,
+        eventTitle: event.title,
+        eventBanner: event.banner,
+        eventDate: event.startDate,
+        eventTime: event.startTime,
+        eventType: (event.type === 'physical' || event.type === 'virtual' ? event.type : 'virtual') as 'physical' | 'virtual',
+        eventVenue: event.type === 'physical' ? event.city : undefined,
+        eventVirtualLink: event.type === 'virtual' ? event.virtualLink : undefined,
+
+        // Attendee Information (from user profile)
+        userId: currentUser.uid,
+        attendeeName: userProfile.name || userProfile.displayName || 'Unknown',
+        attendeeEmail: userProfile.email || currentUser.email || '',
+        attendeePhone: userProfile.phone || '',
+        attendeeProfileImage: (userProfile as any).profilePicture || (userProfile as any).photoURL,
+
+        // Organizer Information
+        organizerId: event.organizerId || '',
+        organizerName: event.organizerName,
+        organizerEmail: '', // Can be added if available
+
+        // Payment Information
+        price: event.price,
+        priceInFOG: cost,
+        priceInPKR: '', // Add if available from event data
+        paymentMethod: cost > 0 ? 'fog-coins' : 'free',
+      });
+
+      // Deduct FOG coins if paid event (from userEarnings.availableBalance)
+      if (cost > 0) {
+        await updateUserFogCoins(
+          currentUser.uid,
+          -cost,
+          'Event Ticket Purchase',
+          `Ticket for ${event.title}`,
+          'event_ticket_purchase',
+          'events',
+          event.id
+        );
+        setUserBalance(prev => prev - cost);
+      }
+
+      // Fetch the created ticket to display
+      const createdTicket = await getUserEventTicket(currentUser.uid, event.id);
+
+      setIsPurchased(true);
+      setTicket(createdTicket);
+
+      console.log('✅ Ticket purchased successfully:', ticketId);
+    } catch (error) {
+      console.error('❌ Error purchasing ticket:', error);
+      setPurchaseError('Failed to purchase ticket. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="animate-fade-in pb-20 relative flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="animate-spin text-[var(--color-primary)] mx-auto mb-4" size={48} />
+          <p className="text-[var(--color-text-secondary)] font-medium">Loading event details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !event) {
+    return (
+      <div className="animate-fade-in pb-20 relative">
+        <div className="text-center py-20">
+          <AlertCircle className="mx-auto text-[var(--color-text-secondary)] mb-4" size={48} />
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
+            {error || 'Event Not Found'}
+          </h2>
+          <p className="text-[var(--color-text-secondary)] mb-6">
+            {error ? 'Please try again or contact support if the problem persists.' : "The event you're looking for doesn't exist or has been removed."}
+          </p>
+          <Button onClick={() => navigate('events')}>Back to Events</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="animate-fade-in pb-20 relative">
+      <ShareModal isOpen={showShare} onClose={() => setShowShare(false)} event={event} slug={slug || ''} />
+
+      {/* Top Bar */}
+      <div className="flex items-center justify-between mb-6">
+        <button onClick={() => navigate('events')} className="flex items-center gap-2 text-sm font-bold text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors group px-4 py-2 rounded-full hover:bg-[var(--color-bg-secondary)]">
+          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+          Back to Events
+        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowShare(true)} className="p-2.5 rounded-full border border-[var(--color-border)] hover:border-[var(--color-primary)] text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-all bg-[var(--color-card)] shadow-sm">
+            <Share2 size={18} />
+          </button>
+          <button onClick={handleSave} className={`p-2.5 rounded-full border transition-all shadow-sm ${isSaved ? 'bg-rose-50 border-rose-200 text-rose-500' : 'bg-[var(--color-card)] border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-rose-500'}`}>
+            <Heart size={18} className={isSaved ? 'fill-current' : ''} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-12 gap-8 lg:gap-10">
+
+        {/* LEFT COLUMN: Content (8 cols) */}
+        <div className="lg:col-span-8 space-y-10">
+
+          {/* Banner */}
+          <div className="relative h-[480px] rounded-[2.5rem] overflow-hidden shadow-2xl group border border-[var(--color-border)]">
+            <img src={event.banner} alt={event.title} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/10"></div>
+
+            {/* Live Badge */}
+            <div className="absolute top-8 left-8">
+              <span className="bg-gradient-to-r from-red-500 to-rose-600 text-white border border-red-400/30 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(244,63,94,0.4)] animate-pulse flex items-center gap-2">
+                <span className="w-2 h-2 bg-white rounded-full"></span> Live Now
+              </span>
+            </div>
+
+            {/* Text Content Overlay */}
+            <div className="absolute bottom-0 left-0 w-full p-10 text-white">
+              <div className="flex items-center gap-3 mb-5">
+                <span className="bg-black/80 backdrop-blur-md border border-white/10 text-[var(--color-accent)] px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest flex items-center gap-2">
+                  <LayoutGrid size={12} /> {event.category}
+                </span>
+                <span className="w-1 h-1 bg-white/50 rounded-full"></span>
+                <span className="bg-black/80 backdrop-blur-md border border-white/10 text-white px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest flex items-center gap-2">
+                  {event.type} Event
+                </span>
+              </div>
+
+              <h1 className="text-4xl md:text-5xl font-extrabold mb-8 leading-[1.1] tracking-tight drop-shadow-lg max-w-3xl">{event.title}</h1>
+
+              <div className="flex flex-wrap gap-4 text-sm font-medium text-white">
+                <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 hover:bg-black/50 transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--color-primary)]/20 flex items-center justify-center text-[var(--color-accent)] border border-[var(--color-primary)]/30">
+                    <Calendar size={20} />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-white/60 uppercase font-bold tracking-widest mb-0.5">Date</span>
+                    <span className="font-bold">{event.startDate}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 hover:bg-black/50 transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--color-primary)]/20 flex items-center justify-center text-[var(--color-accent)] border border-[var(--color-primary)]/30">
+                    <Clock size={20} />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-white/60 uppercase font-bold tracking-widest mb-0.5">Time</span>
+                    <span className="font-bold">{event.startTime}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="bg-[var(--color-card)] p-10 rounded-[2.5rem] shadow-sm border border-[var(--color-border)]">
+            <h2 className="text-2xl font-bold mb-6 font-heading text-[var(--color-text-primary)]">About This Event</h2>
+            <div className="text-[var(--color-text-secondary)] leading-relaxed text-base break-words overflow-hidden">
+              <p className="break-words">{event.description}</p>
+            </div>
+
+            <div className="mt-10 pt-8 border-t border-[var(--color-border)]">
+              <h3 className="text-sm font-bold text-[var(--color-text-secondary)] uppercase tracking-wider mb-4">Tags</h3>
+              <div className="flex flex-wrap gap-2">
+                {event.tags.map(tag => (
+                  <span key={tag} className="px-5 py-2 bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] text-xs font-bold rounded-xl border border-[var(--color-border)]">#{tag}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Organizer */}
+          <div className="bg-[var(--color-card)] p-8 rounded-[2.5rem] shadow-sm border border-[var(--color-border)] flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-5">
+              <div className="relative">
+                <img src={event.organizerAvatar} alt={event.organizerName} className="w-20 h-20 rounded-full bg-[var(--color-bg-secondary)] object-cover border-4 border-[var(--color-card)] shadow-lg" />
+                <div className="absolute bottom-0 right-0 bg-[var(--color-primary)] p-1 rounded-full border-2 border-[var(--color-card)]"><CheckCircle2 size={12} className="text-white" /></div>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider mb-1">Organized By</p>
+                <h3 className="font-bold text-xl text-[var(--color-text-primary)]">{event.organizerName}</h3>
+                <p className="text-sm text-[var(--color-text-secondary)]">Member since 2023 • 4.9 Rating</p>
+              </div>
+            </div>
+            <Button variant="outline" className="rounded-xl px-6" onClick={() => navigate(`user/${event.organizerId}` as any, event.organizerId)}>View Profile</Button>
+          </div>
+
+          {/* Google Maps Section */}
+          {(event.type === 'physical' || event.type === 'hybrid') && event.address && event.city && (
+            <div className="bg-[var(--color-card)] p-8 rounded-[2.5rem] shadow-sm border border-[var(--color-border)]">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center">
+                  <MapPin size={24} className="text-[var(--color-primary)]" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[var(--color-text-primary)]">Event Location</h3>
+                  <p className="text-sm text-[var(--color-text-secondary)]">How to get there</p>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <p className="font-bold text-lg text-[var(--color-text-primary)] mb-2">{event.address}</p>
+                <p className="text-[var(--color-text-secondary)]">{event.city}, {event.country}</p>
+              </div>
+
+              {/* Map with Loading Placeholder */}
+              <div className="relative mb-6 rounded-2xl overflow-hidden border border-[var(--color-border)]">
+                {isMapLoading && (
+                  <div className="absolute inset-0 bg-[var(--color-bg-secondary)] flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <Loader2 className="animate-spin text-[var(--color-primary)] mx-auto mb-3" size={32} />
+                      <p className="text-sm text-[var(--color-text-secondary)] font-medium">Loading map...</p>
+                    </div>
+                  </div>
+                )}
+                <iframe
+                  width="100%"
+                  height="400"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent(event.address + ', ' + event.city + ', ' + event.country)}`}
+                  onLoad={() => setIsMapLoading(false)}
+                />
+              </div>
+
+              {/* Map Action Buttons */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={() => {
+                    const address = encodeURIComponent(`${event.address}, ${event.city}, ${event.country}`);
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
+                  }}
+                  className="py-4 px-6 rounded-xl bg-[var(--color-bg-secondary)] hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] font-bold transition-all flex items-center justify-center gap-2 border border-[var(--color-border)]"
+                >
+                  <MapPin size={18} /> Open in Google Maps
+                </button>
+                <button
+                  onClick={() => {
+                    const address = encodeURIComponent(`${event.address}, ${event.city}, ${event.country}`);
+                    window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, '_blank');
+                  }}
+                  className="py-4 px-6 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-white font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-[var(--color-primary)]/20"
+                >
+                  <ExternalLink size={18} /> Get Directions
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Suggested */}
+          <div>
+            <h3 className="text-xl font-bold text-[var(--color-text-primary)] mb-6">More Like This</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {suggestedEvents.map(se => {
+                const seSlug = `${se.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}-${se.id}`;
+                return (
+                  <div key={se.id} className="group cursor-pointer bg-[var(--color-card)] p-3 rounded-2xl border border-[var(--color-border)] hover:shadow-lg transition-all" onClick={() => navigate(`event/${seSlug}` as any, seSlug)}>
+                    <div className="h-32 rounded-xl overflow-hidden mb-3 relative">
+                      <img src={se.banner} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    </div>
+                    <div className="px-1">
+                      <h4 className="font-bold text-sm leading-tight text-[var(--color-text-primary)] group-hover:text-[var(--color-primary)] transition-colors mb-1">{se.title}</h4>
+                      <p className="text-xs text-[var(--color-text-secondary)] font-bold">{se.startDate}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Sidebar (4 cols) */}
+        <div className="lg:col-span-4 space-y-6">
+
+          {/* Action Card */}
+          <div className="bg-[var(--color-card)] p-8 rounded-[2.5rem] shadow-xl shadow-[var(--color-border)]/50 border border-[var(--color-border)]">
+            <div className="flex justify-between items-end mb-8 border-b border-[var(--color-border)] pb-8">
+              <div>
+                <p className="text-[10px] text-[var(--color-text-secondary)] font-bold uppercase tracking-wider mb-1">Price</p>
+                <p className="text-3xl font-extrabold text-[var(--color-text-primary)] leading-tight truncate">{event.price}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-[var(--color-text-secondary)] font-bold uppercase tracking-wider mb-1">Wallet</p>
+                <p className="text-sm font-bold text-[var(--color-primary)]">{userBalance.toFixed(2)} FOG</p>
+              </div>
+            </div>
+
+            {/* Ticket Availability Info */}
+            {!isEventOrganizer && (
+              <div className="mb-6">
+                <div className="bg-[var(--color-bg-secondary)] rounded-2xl p-5 border border-[var(--color-border)]">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-[10px] text-[var(--color-text-secondary)] font-bold uppercase tracking-wider mb-1">Tickets Sold</p>
+                      <p className="text-2xl font-extrabold text-[var(--color-text-primary)]">{event.attendees}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-[var(--color-text-secondary)] font-bold uppercase tracking-wider mb-1">Remaining</p>
+                      <p className={`text-2xl font-extrabold ${event.maxCapacity - event.attendees < 10 ? 'text-rose-600' : 'text-[var(--color-primary)]'}`}>
+                        {event.maxCapacity - event.attendees}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full bg-[var(--color-bg-tertiary)] rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${(event.attendees / event.maxCapacity) * 100 > 90 ? 'bg-rose-500' :
+                        (event.attendees / event.maxCapacity) * 100 > 70 ? 'bg-amber-500' :
+                          'bg-[var(--color-primary)]'
+                        }`}
+                      style={{ width: `${Math.min((event.attendees / event.maxCapacity) * 100, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-[var(--color-text-secondary)] font-bold mt-2 text-center">
+                    {((event.attendees / event.maxCapacity) * 100).toFixed(0)}% Booked
+                  </p>
+                </div>
+
+                {/* Urgent Marquee - Show when tickets left < 10 */}
+                {event.maxCapacity - event.attendees < 10 && event.maxCapacity - event.attendees > 0 && (
+                  <div className="mt-4 bg-gradient-to-r from-rose-500 via-pink-500 to-rose-500 rounded-2xl p-1 overflow-hidden relative">
+                    <div className="bg-[var(--color-card)] rounded-xl py-3 px-4 overflow-hidden">
+                      <div className="flex animate-marquee whitespace-nowrap">
+                        <span className="text-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-rose-600 to-pink-600 mx-4">
+                          🔥 HURRY UP! Only {event.maxCapacity - event.attendees} tickets left!
+                        </span>
+                        <span className="text-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-rose-600 to-pink-600 mx-4">
+                          ⚡ Grab yours before it's too late!
+                        </span>
+                        <span className="text-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-rose-600 to-pink-600 mx-4">
+                          🔥 HURRY UP! Only {event.maxCapacity - event.attendees} tickets left!
+                        </span>
+                        <span className="text-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-rose-600 to-pink-600 mx-4">
+                          ⚡ Grab yours before it's too late!
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isEventOrganizer ? (
+              <div className="space-y-4">
+                <div className="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 rounded-2xl p-4 text-center mb-6 flex items-center justify-center gap-2">
+                  <CheckCircle2 size={18} className="text-[var(--color-primary)]" />
+                  <span className="text-[var(--color-primary)] font-bold text-sm">You are the organizer</span>
+                </div>
+                <Button
+                  size="lg"
+                  className="w-full shadow-lg shadow-[var(--color-primary)]/20 text-lg bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-white border-none rounded-2xl py-4 h-auto"
+                  onClick={() => navigate('manage-events')}
+                >
+                  <LayoutGrid className="inline mr-2" size={20} />
+                  Manage Events
+                </Button>
+                <p className="text-center text-xs text-[var(--color-text-secondary)] font-medium leading-relaxed">
+                  View and manage all your events from the manage page.
+                </p>
+              </div>
+            ) : isPurchased && ticket ? (
+              <div className="animate-fade-in">
+                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-center mb-6 flex items-center justify-center gap-2">
+                  <CheckCircle2 size={18} className="text-emerald-600" />
+                  <span className="text-emerald-800 font-bold text-sm">Ticket Confirmed</span>
+                </div>
+                <VirtualTicket
+                  event={event}
+                  attendeeName={ticket.attendeeName}
+                  ticketId={ticket.ticketId}
+                  virtualLink={ticket.eventVirtualLink}
+                />
+              </div>
+            ) : (
+              <div className="space-y-4 mb-6">
+                {purchaseError && (
+                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-2 text-rose-600 text-xs font-bold">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                    {purchaseError}
+                  </div>
+                )}
+
+                {hasEventStarted() && (
+                  <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-2 text-amber-600 text-xs font-bold">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                    This event has already started. Booking is closed.
+                  </div>
+                )}
+
+                {isSoldOut && (
+                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-2 text-rose-600 text-xs font-bold">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                    Sold Out! All tickets have been booked.
+                  </div>
+                )}
+
+                <Button
+                  size="lg"
+                  className="w-full shadow-lg shadow-teal-600/20 text-lg bg-teal-600 hover:bg-teal-700 text-white border-none rounded-2xl py-4 h-auto disabled:opacity-70"
+                  onClick={handlePurchase}
+                  disabled={isProcessing || event.status === 'expired' || hasEventStarted() || isSoldOut}
+                >
+                  {isProcessing ? <Loader2 className="animate-spin inline mr-2" size={20} /> : <Ticket className="inline mr-2" size={20} />}
+                  {isProcessing ? 'Processing...' : hasEventStarted() ? 'Booking Closed' : isSoldOut ? 'Sold Out' : event.price === 'Free' ? 'Register Now' : 'Buy Ticket'}
+                </Button>
+                <p className="text-center text-xs text-[var(--color-text-secondary)] font-medium leading-relaxed">
+                  {event.price !== 'Free' && !hasEventStarted() && !isSoldOut && `~${parseFloat(event.price.replace(/[^0-9.]/g, ''))} coins will be deducted.`}
+                  {!hasEventStarted() && !isSoldOut && <><br />Limited spots available. {event.attendees} / {event.maxCapacity} registered.</>}
+                </p>
+              </div>
+            )}
+
+            <div className="bg-[var(--color-bg-secondary)] rounded-3xl p-6 border border-[var(--color-border)] mt-8">
+              <h4 className="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase tracking-widest mb-4">Event Details</h4>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--color-card)] flex items-center justify-center text-[var(--color-text-secondary)] border border-[var(--color-border)] shadow-sm"><Users size={18} /></div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase">Capacity</span>
+                    <span className="text-[var(--color-text-primary)] font-bold">{event.maxCapacity} Seats</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--color-card)] flex items-center justify-center text-[var(--color-text-secondary)] border border-[var(--color-border)] shadow-sm"><Globe size={18} /></div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase">Access</span>
+                    <span className="text-[var(--color-text-primary)] font-bold">{event.type}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Location / Stream Info Card */}
+          <div className="bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-accent)] text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-[60px]"></div>
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                  {event.type === 'virtual' ? <MonitorPlay size={24} className="text-white" /> : <MapPin size={24} className="text-white" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg leading-none">
+                    {event.type === 'virtual' ? 'Virtual Event' : 'Physical Event'}
+                  </h3>
+                  <p className="text-xs text-white/70 font-bold mt-1 uppercase tracking-wider">Event Type</p>
+                </div>
+              </div>
+
+              {(event.type === 'physical' || event.type === 'hybrid') && (
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20">
+                  <p className="text-sm font-bold text-white/90 mb-2">Venue</p>
+                  <p className="font-bold text-base mb-1">{event.address || 'Venue TBA'}</p>
+                  <p className="text-white/70 text-sm">{event.city}, {event.country}</p>
+                </div>
+              )}
+
+              {(event.type === 'virtual' || event.type === 'hybrid') && (
+                <div className="bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/20 mt-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                      <MonitorPlay size={20} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">Live Stream Access</h3>
+                      <p className="text-xs text-white/70">Join the virtual event</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-white/70 mb-4 pb-4 border-b border-white/20">
+                    Link becomes active 15 mins before start.
+                  </p>
+
+                  <button
+                    className="w-full py-3 rounded-xl bg-white hover:bg-white/90 text-[var(--color-primary)] text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                    disabled={!isPurchased}
+                  >
+                    <MonitorPlay size={16} />
+                    <span>{isPurchased ? 'Open Stream' : 'Buy Ticket to Access'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EventDetailPage = ({
+  navigate,
+  context: slug,
+  currentUser,
+  isLoggedIn
+}: {
+  navigate: (route: Route, context?: any) => void,
+  context?: any,
+  currentUser?: any,
+  isLoggedIn?: boolean
+}) => {
+  return (
+    <div className="pt-24 min-h-screen bg-[var(--color-bg-primary)]">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+        <EventDetail navigate={navigate} context={slug} currentUser={currentUser} isLoggedIn={isLoggedIn} />
+      </div>
+    </div>
+  );
+};
+
+export default EventDetailPage;

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="lakeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3a86ff" />
+      <stop offset="50%" stop-color="#8ecae6" />
+      <stop offset="100%" stop-color="#219ebc" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="360" fill="url(#lakeGrad)" />
+  <!-- Distant green hills -->
+  <polygon points="0,220 180,140 380,240 600,160 600,360 0,360" fill="#2d6a4f" opacity="0.6" />
+  <polygon points="0,250 240,180 480,260 600,210 600,360 0,360" fill="#40916c" opacity="0.8" />
+  <rect x="0" y="270" width="600" height="90" fill="#52b788" />
+  <!-- Stalls -->
+  <polygon points="80,290 140,230 200,290" fill="#d90429" />
+  <polygon points="220,290 280,230 340,290" fill="#ffb703" />
+  <polygon points="360,290 420,230 480,290" fill="#3a86ff" />
+  <!-- Center Plate -->
+  <rect x="70" y="50" width="460" height="150" rx="18" fill="#ffffff" filter="drop-shadow(0 12px 24px rgba(0,0,0,0.18))" />
+  <text x="300" y="95" font-family="'Inter', sans-serif" font-weight="800" font-size="12" fill="#2d6a4f" text-anchor="middle" letter-spacing="3">ISLAMABAD WATERFRONT PROMENADE</text>
+  <text x="300" y="140" font-family="'Montserrat', sans-serif" font-weight="900" font-size="28" fill="#1b4332" text-anchor="middle">FARMERS MARKET</text>
+  <text x="300" y="170" font-family="'Inter', sans-serif" font-weight="600" font-size="13" fill="#e76f51" text-anchor="middle">Fresh Produce · Artisan Food Stalls · Live Acoustics</text>
+</svg>

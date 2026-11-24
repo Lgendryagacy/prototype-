@@ -1,0 +1,236 @@
+import React, { useState, useEffect } from 'react';
+import Sidebar from '../components/admin/views/Sidebar';
+import Header from '../components/admin/views/Header';
+import DashboardView from '../components/admin/views/DashboardView';
+import AdsManagementView from '../components/admin/views/AdsManagementView';
+import FogCoinManagementView from '../components/admin/views/FogCoinManagementView';
+import ThemeManagementView from '../components/admin/views/ThemeManagementView';
+import PaymentRequestsView from '../components/admin/views/PaymentRequestsView';
+import PaymentMethodsView from '../components/admin/views/PaymentMethodsView';
+import WithdrawalManagementView from '../components/admin/views/WithdrawalManagementView';
+import UserManagementView from '../components/admin/views/UserManagementView';
+import ContentManagementView from '../components/admin/views/ContentManagementView';
+import DisputeManagementView from '../components/admin/views/DisputeManagementView';
+import MarketingView from '../components/admin/views/MarketingView';
+import SettingsView from '../components/admin/views/SettingsView';
+import BrandManagementView from '../components/admin/views/BrandManagementView';
+import JobManagementView from '../components/admin/views/JobManagementView';
+import FreelanceManagementView from '../components/admin/views/FreelanceManagementView';
+import { onAuthStateChange, signOutUser } from '../firebase/services/authService';
+import { isUserAdmin } from '../firebase/services/adminPromotion';
+import { getUserProfile } from '../firebase/services/userService';
+import { User } from '../firebase/types/user';
+import { UserProfile } from '../firebase/types/user';
+import { toast } from 'react-hot-toast';
+
+import { type Route } from '../types';
+
+export type AdminDashboardView = 
+  | 'dashboard' 
+  | 'theme-management' 
+  | 'ads-management'
+  | 'fog-coin-management'
+  | 'brand-management'
+  | 'job-management'
+  | 'freelance-management'
+  | 'payment-requests'
+  | 'payment-methods'
+  | 'withdrawal-management'
+  | 'user-management'
+  | 'content-management'
+  | 'dispute-management'
+  | 'marketing'
+  | 'settings';
+
+interface AdminDashboardPageProps {
+  navigate: (route: Route) => void;
+}
+
+export const ADMIN_VIEW_TITLES: Record<AdminDashboardView, string> = {
+    'dashboard': 'Dashboard',
+    'theme-management': 'Theme Management',
+    'ads-management': 'Ads Management',
+    'fog-coin-management': 'FOG Coin Management',
+    'brand-management': 'Brand Management',
+    'job-management': 'Job Requests',
+    'freelance-management': 'Freelance Requests',
+    'payment-requests': 'Payment Requests',
+    'payment-methods': 'Payment Methods',
+    'withdrawal-management': 'Withdrawal Management',
+    'user-management': 'User Management',
+    'content-management': 'Content Management',
+    'dispute-management': 'Dispute Management',
+    'marketing': 'Marketing',
+    'settings': 'Settings'
+};
+
+export default function AdminDashboardPage({ navigate }: AdminDashboardPageProps) {
+  const [view, setView] = useState<AdminDashboardView>('dashboard');
+  const [isVerifyingAccess, setIsVerifyingAccess] = useState(true);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  
+
+  // Verify admin access on component mount
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+
+    const verifyAdminAccess = async () => {
+      try {
+        unsubscribe = onAuthStateChange(async (user) => {
+          if (!user) {
+            console.log('No user logged in, redirecting to home');
+            navigate('home');
+            return;
+          }
+
+          const adminStatus = await isUserAdmin(user.uid);
+          if (!adminStatus) {
+            console.log('User is not admin, redirecting to home');
+            navigate('home');
+            return;
+          }
+
+          // Set current user
+          setCurrentUser({
+            uid: user.uid,
+            email: user.email!,
+            displayName: user.displayName || undefined,
+            emailVerified: user.emailVerified
+          });
+
+          // Fetch user profile for additional info
+          try {
+            const profile = await getUserProfile(user.uid);
+            setUserProfile(profile);
+          } catch (error) {
+            console.error('Error fetching user profile:', error);
+          }
+
+          setHasAccess(true);
+          setIsVerifyingAccess(false);
+        });
+      } catch (error) {
+        console.error('Error verifying admin access:', error);
+        navigate('home');
+      }
+    };
+
+    verifyAdminAccess();
+    
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [navigate]);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await signOutUser();
+      toast.success('Signed out successfully');
+      navigate('auth');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast.error('Failed to sign out');
+    }
+  };
+
+  // Handle refresh data
+  const handleRefreshData = () => {
+    console.log('Refreshing admin data...');
+    toast.success('Data refreshed successfully');
+    // Force refresh by re-triggering the auth state change
+    window.location.reload();
+  };
+
+  // Show loading while verifying access
+  if (isVerifyingAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-white">Verifying admin access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if no access (should have already redirected)
+  if (!hasAccess) {
+    return null;
+  }
+
+  const handleCreateNewAd = () => {
+    // TODO: Open create ad modal or navigate to create ad page
+    console.log('Create new ad');
+  };
+
+  const handleEditAd = (ad: any) => {
+    console.log('Edit ad:', ad);
+    // TODO: Navigate to edit ad page or open edit modal
+  };
+
+  const handleViewAd = (ad: any) => {
+    console.log('View ad:', ad);
+    // TODO: Navigate to ad details page or open view modal
+  };
+
+  const handleViewAnalytics = (adId: string) => {
+    // Navigate to the dedicated AdAnalyticsPage
+    window.location.href = `/admin/ad-analytics/${adId}`;
+  };
+
+  const renderContent = () => {
+    switch (view) {
+      case 'dashboard': return <DashboardView />;
+      case 'ads-management': return (
+        <AdsManagementView 
+          onCreateNew={handleCreateNewAd}
+          onEditAd={handleEditAd}
+          onViewAd={handleViewAd}
+          onViewAnalytics={handleViewAnalytics}
+        />
+      );
+      case 'fog-coin-management': return <FogCoinManagementView />;
+      case 'theme-management': return <ThemeManagementView />;
+      case 'brand-management': return <BrandManagementView />;
+      case 'job-management': return <JobManagementView />;
+      case 'freelance-management': return <FreelanceManagementView />;
+      case 'payment-requests': return <PaymentRequestsView />;
+      case 'payment-methods': return <PaymentMethodsView />;
+      case 'withdrawal-management': return <WithdrawalManagementView />;
+      case 'user-management': return <UserManagementView />;
+      case 'content-management': return <ContentManagementView />;
+      case 'dispute-management': return <DisputeManagementView />;
+      case 'marketing': return <MarketingView />;
+      case 'settings': return <SettingsView />;
+      default:
+        // FIX: The switch is exhaustive, so TypeScript infers `view` as type `never`.
+        // We cast it to a string to allow this fallback logic to work if a new AdminView type is added without a corresponding case.
+        const title = (view as string).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        return <div className="text-white">Page not found: {title}</div>;
+    }
+  };
+
+  return (
+    <div className="flex bg-slate-900 min-h-screen font-sans">
+      <Sidebar view={view} setView={setView} />
+      <div className="flex-1 flex flex-col min-w-0">
+        <Header 
+          currentView={view} 
+          navigate={navigate} 
+          currentUser={currentUser}
+          userProfile={userProfile}
+          onLogout={handleLogout}
+          onRefreshData={handleRefreshData}
+        />
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+          {renderContent()}
+        </main>
+      </div>
+    </div>
+  );
+}

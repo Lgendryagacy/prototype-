@@ -1,0 +1,740 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { type Route } from '../types';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { ArrowLeft, Search, Send, Loader2, Image as ImageIcon, Video, FileText } from 'lucide-react';
+import { ConversationItem } from '../components/chat/ConversationItem';
+import { MessageInput } from '../components/chat/MessageInput';
+import { ServiceListMessage } from '../components/chat/ServiceListMessage';
+import { ServiceInquiryMessage } from '../components/chat/ServiceInquiryMessage';
+import { User } from '../firebase/types/user';
+import { ChatMessage, Conversation } from '../firebase/types/message';
+import { 
+  getOrCreateConversation, 
+  sendWelcomeMessage, 
+  hasWelcomeMessage,
+  sendMessage,
+  subscribeToMessages,
+  subscribeToConversations,
+  markMessagesAsRead
+} from '../firebase/services/messageService';
+import { getBrandServices } from '../firebase/services/brandServiceService';
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { toast } from 'react-hot-toast';
+
+interface MessagesPageProps {
+  navigate: (route: Route, context?: any, options?: { name?: string }) => void;
+  context?: { 
+    brandId?: string;
+    serviceInquiry?: {
+      serviceName: string;
+      packageName?: string;
+      price?: string;
+      deliveryTime?: string;
+      hourlyRate?: string;
+      minimumHours?: number;
+    };
+  };
+  user?: User | null;
+  isLoggedIn?: boolean;
+}
+
+const MessagesPage = ({ navigate, context, user, isLoggedIn }: MessagesPageProps) => {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sendingMessages, setSendingMessages] = useState<ChatMessage[]>([]); // Optimistic messages
+  const [loading, setLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [initializingChat, setInitializingChat] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [messageText, setMessageText] = useState('');
+  const [brandData, setBrandData] = useState<any>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const unsubscribeConversations = useRef<(() => void) | null>(null);
+  const unsubscribeMessages = useRef<(() => void) | null>(null);
+  const inquirySentRef = useRef<boolean>(false); // Prevent duplicate inquiry messages
+
+  // Check if user is logged in
+  useEffect(() => {
+    if (!user || !isLoggedIn) {
+      toast.error('Please login to access messages');
+      navigate('auth');
+      return;
+    }
+  }, [user, isLoggedIn]);
+
+  // Initialize conversation if brandId is provided
+  useEffect(() => {
+    if (context?.brandId && user && !inquirySentRef.current) {
+      initializeConversation(context.brandId);
+    }
+  }, [context?.brandId, user]);
+
+  // Subscribe to user's conversations
+  useEffect(() => {
+    if (!user) return;
+
+    setLoading(true);
+
+    unsubscribeConversations.current = subscribeToConversations(user.uid, (convos) => {
+      // Deduplicate conversations - keep only the latest conversation per brand
+      const uniqueConversations = new Map<string, Conversation>();
+      
+      convos.forEach(convo => {
+        const existing = uniqueConversations.get(convo.brandId);
+        if (!existing || convo.lastMessageTime > existing.lastMessageTime) {
+          uniqueConversations.set(convo.brandId, convo);
+        }
+      });
+      
+      const deduplicatedConvos = Array.from(uniqueConversations.values())
+        .sort((a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime());
+      
+      setConversations(deduplicatedConvos);
+      setLoading(false);
+
+      // Auto-select the conversation if coming from brandId context
+      if (context?.brandId && !selectedConversation) {
+        const targetConvo = deduplicatedConvos.find(c => c.brandId === context.brandId);
+        if (targetConvo) {
+          setSelectedConversation(targetConvo);
+        }
+      }
+    });
+
+    return () => {
+      if (unsubscribeConversations.current) {
+        unsubscribeConversations.current();
+      }
+    };
+  }, [user, context?.brandId]);
+
+  // Subscribe to messages when conversation is selected
+  useEffect(() => {
+    if (!selectedConversation) {
+      setMessages([]);
+      return;
+    }
+
+    setMessagesLoading(true);
+
+    unsubscribeMessages.current = subscribeToMessages(selectedConversation.id, (msgs) => {
+      setMessages(msgs);
+      setMessagesLoading(false);
+
+      // Scroll to latest message after messages load
+      if (msgs.length > 0) {
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 100);
+      }
+
+      // Mark messages as read
+      if (msgs.length > 0) {
+        markMessagesAsRead(selectedConversation.id, 'user');
+      }
+    });
+
+    return () => {
+      if (unsubscribeMessages.current) {
+        unsubscribeMessages.current();
+      }
+    };
+  }, [selectedConversation]);
+
+  // Initialize conversation with brand
+  const initializeConversation = async (brandId: string) => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      setInitializingChat(true);
+
+      // Fetch brand data
+      const brandDoc = await getDoc(doc(db, 'brands', brandId));
+      if (!brandDoc.exists()) {
+        toast.error('Brand not found');
+        navigate('fog-services');
+        return;
+      }
+
+      const brandDataRaw = brandDoc.data();
+      const brand = { 
+        id: brandDoc.id, 
+        brandName: brandDataRaw.brandName || '', 
+        logoUrl: brandDataRaw.logoUrl || '',
+        ...brandDataRaw 
+      };
+      setBrandData(brand);
+
+      // Get or create conversation
+      const result = await getOrCreateConversation(
+        user.uid,
+        user.displayName || user.email || 'User',
+        undefined, // photoURL not in User type
+        brandId,
+        brand.brandName,
+        brand.logoUrl
+      );
+
+      if (!result.success || !result.conversationId) {
+        toast.error(result.error || 'Failed to create conversation');
+        return;
+      }
+
+      // Check if welcome message already sent
+      const hasWelcome = await hasWelcomeMessage(result.conversationId);
+
+      if (!hasWelcome) {
+        // Fetch brand services
+        const services = await getBrandServices(brandId);
+        const activeServices = services.filter(s => s.status === 'active');
+
+        // Prepare service list (limit to 5 for data, but only 2 will be shown)
+        const serviceList = activeServices.slice(0, 5).map(service => {
+          const firstPackage = service.pricing.type === 'fixed' && service.pricing.packages?.[0];
+          const hourlyRate = service.pricing.type === 'hourly' && service.pricing.hourlyRate;
+
+          const price = firstPackage 
+            ? `${firstPackage.currency} ${firstPackage.price.toLocaleString()}`
+            : hourlyRate
+            ? `${hourlyRate.currency} ${hourlyRate.rate.toLocaleString()}/hr`
+            : 'Contact for price';
+
+          const deliveryTime = firstPackage?.deliveryTime || 
+            (hourlyRate ? `${hourlyRate.minimumHours}h min` : 'Contact for details');
+
+          return {
+            id: service.id,
+            name: service.title,
+            price,
+            deliveryTime,
+            image: service.mainImage
+          };
+        });
+
+        // Send welcome message with total count
+        await sendWelcomeMessage(
+          result.conversationId,
+          brandId,
+          brand.brandName,
+          brand.logoUrl,
+          serviceList,
+          activeServices.length // Total number of services
+        );
+      }
+
+      // Send service inquiry message if provided in context
+      if (context?.serviceInquiry && !inquirySentRef.current) {
+        inquirySentRef.current = true; // Mark as sent to prevent duplicates
+        
+        const inquiry = context.serviceInquiry;
+
+        // Wait a bit for welcome message to be sent, then send inquiry
+        setTimeout(async () => {
+          await sendMessage(
+            user.uid,
+            user.displayName || user.email || 'User',
+            undefined,
+            {
+              conversationId: result.conversationId!,
+              message: '💬 Looking forward to discussing this further',
+              messageType: 'service-inquiry',
+              attachments: [],
+              inquiryData: inquiry
+            }
+          );
+        }, 1000);
+      }
+
+      // The conversation will be selected automatically via the subscription
+    } catch (error) {
+      console.error('Error initializing conversation:', error);
+      toast.error('Failed to start conversation');
+    } finally {
+      setLoading(false);
+      setInitializingChat(false);
+    }
+  };
+
+  // Handle send message
+  const handleSendMessage = async (message: string, files: File[]) => {
+    if (!user || !selectedConversation || (!message.trim() && files.length === 0)) return;
+
+    // Create optimistic message
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage: ChatMessage = {
+      id: tempId,
+      conversationId: selectedConversation.id,
+      senderId: user.uid,
+      senderType: 'user',
+      senderName: user.displayName || user.email || 'User',
+      senderAvatar: undefined,
+      message: message,
+      messageType: 'text',
+      status: 'sending',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      attachments: files.length > 0 ? files.map((file, index) => ({
+        id: `temp-${index}`,
+        type: file.type.startsWith('image/') ? 'image' as const : 
+              file.type.startsWith('video/') ? 'video' as const :
+              file.type === 'application/pdf' ? 'pdf' as const : 'document' as const,
+        url: URL.createObjectURL(file), // Temporary local URL
+        name: file.name,
+        size: file.size
+      })) : undefined
+    };
+
+    // Add to sending messages
+    setSendingMessages(prev => [...prev, optimisticMessage]);
+    setMessageText('');
+
+    // Scroll to show the new message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 50);
+
+    try {
+      const result = await sendMessage(
+        user.uid,
+        user.displayName || user.email || 'User',
+        undefined, // photoURL not in User type
+        {
+          conversationId: selectedConversation.id,
+          message,
+          attachments: files
+        }
+      );
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to send message');
+        // Remove the optimistic message on error
+        setSendingMessages(prev => prev.filter(m => m.id !== tempId));
+        return;
+      }
+
+      // Remove from sending messages (real message will come from Firestore subscription)
+      setSendingMessages(prev => prev.filter(m => m.id !== tempId));
+      
+      // Scroll to latest message after sending
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error('Failed to send message');
+      // Remove the optimistic message on error
+      setSendingMessages(prev => prev.filter(m => m.id !== tempId));
+    }
+  };
+
+  // Handle service click from welcome message - Send message to brand
+  const handleServiceClick = async (serviceId: string, serviceName: string) => {
+    if (!user || !selectedConversation) return;
+
+    try {
+      const message = `Hi! I'm interested in learning more about your service: "${serviceName}". Could you provide me with more details?`;
+      
+      const result = await sendMessage(
+        user.uid,
+        user.displayName || user.email || 'User',
+        undefined,
+        {
+          conversationId: selectedConversation.id,
+          message,
+          attachments: []
+        }
+      );
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to send message');
+        return;
+      }
+
+      // Scroll to latest message after sending
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
+    } catch (error) {
+      console.error('Error sending service inquiry:', error);
+      toast.error('Failed to send message');
+    }
+  };
+
+  // Handle view service details
+  const handleServiceView = (serviceId: string) => {
+    navigate('fog-service-detail', serviceId);
+  };
+
+  // Filter conversations based on search
+  const filteredConversations = conversations.filter(convo =>
+    convo.brandName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (!user || !isLoggedIn) {
+    return null;
+  }
+
+  return (
+    <div className="bg-[--color-bg-secondary]  pb-10">
+      <div className="container mx-auto px-4 py-8 pt-2 max-w-7xl">
+        {/* Header */}
+        <div className="mb-2">
+          <Button variant="ghost" onClick={() => navigate('fog-services')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Services
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 lg:gap-6 ">
+          {/* Sidebar - Conversations List */}
+          <div className={`lg:col-span-4 xl:col-span-3 ${selectedConversation ? 'hidden lg:block' : 'block'}`}>
+            <Card className="flex flex-col h-[calc(100vh-140px)]">
+              <CardHeader className="flex-shrink-0 border-b border-[--color-border] pb-4">
+                <CardTitle className='mb-2'>Messages</CardTitle>
+                <div className="mt-4 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-secondary]" />
+                  <Input
+                    placeholder="Search conversations..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-y-auto p-0 scrollbar-custom">
+                {loading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="w-8 h-8 animate-spin text-[--color-primary]" />
+                  </div>
+                ) : filteredConversations.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full p-6  text-center">
+                    <div className="text-6xl mb-4">💬</div>
+                    <h3 className="text-lg font-semibold mb-2">No conversations yet</h3>
+                    <p className="text-sm text-[--color-text-secondary] mb-4">
+                      {searchTerm ? 'No conversations match your search' : 'Start messaging brands to see them here'}
+                    </p>
+                    {!searchTerm && (
+                      <Button onClick={() => navigate('fog-services')}>
+                        Browse Brands
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-[--color-border]">
+                    {filteredConversations.map((convo) => (
+                      <ConversationItem
+                        key={convo.id}
+                        brandName={convo.brandName}
+                        brandLogo={convo.brandLogo}
+                        lastMessage={convo.lastMessage}
+                        lastMessageType={convo.lastMessageType}
+                        lastMessageTime={convo.lastMessageTime}
+                        unreadCount={convo.unreadBy === 'user' ? convo.unreadCount : 0}
+                        isOnline={convo.isOnline}
+                        isActive={selectedConversation?.id === convo.id}
+                        onClick={() => setSelectedConversation(convo)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Chat Area */}
+          <div className={`lg:col-span-8 xl:col-span-9 ${selectedConversation ? 'block' : 'hidden lg:block'}`}>
+            <Card className="flex flex-col h-[calc(100vh-140px)]">
+              {selectedConversation ? (
+                <>
+                  {/* Chat Header */}
+                  <CardHeader className="flex-shrink-0 border-b p-3 md:p-6 border-[--color-border]">
+                    <div className="flex items-center gap-2 md:gap-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="lg:hidden p-1 md:p-2"
+                        onClick={() => setSelectedConversation(null)}
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                      </Button>
+                      
+                      <div className="relative flex-shrink-0">
+                        {selectedConversation.brandLogo ? (
+                          <img
+                            src={selectedConversation.brandLogo}
+                            alt={selectedConversation.brandName}
+                            className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-[--color-primary] to-[--color-primary]/80 flex items-center justify-center text-white font-bold text-sm md:text-base">
+                            {selectedConversation.brandName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          </div>
+                        )}
+                        {selectedConversation.isOnline && (
+                          <div className="absolute bottom-0 right-0 w-2.5 h-2.5 md:w-3 md:h-3 bg-green-500 rounded-full border-2 border-[--color-card]" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base md:text-lg truncate">{selectedConversation.brandName}</h3>
+                        {/* <p className="text-sm text-[--color-text-secondary]">
+                          {selectedConversation.isOnline ? 'Online' : 
+                            selectedConversation.lastSeen 
+                              ? `Last seen ${selectedConversation.lastSeen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                              : 'Offline'
+                          }
+                        </p> */}
+                      </div>
+
+                      {/* <Button
+                        variant="outline"
+                        onClick={() => navigate('fog-service-brand', selectedConversation.brandId)}
+                      >
+                        View Brand
+                      </Button> */}
+                    </div>
+                  </CardHeader>
+
+                  {/* Messages Area */}
+                  <div className="flex-1 overflow-y-auto p-3 md:p-4 lg:p-6 space-y-3 md:space-y-4 scrollbar-custom">
+                    {messagesLoading || initializingChat ? (
+                      <div className="flex flex-col items-center justify-center h-full gap-3">
+                        <Loader2 className="w-8 h-8 animate-spin text-[--color-primary]" />
+                        <p className="text-sm text-[--color-text-secondary]">
+                          {initializingChat ? 'Starting conversation...' : 'Loading messages...'}
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <AnimatePresence>
+                          {/* Render real messages (exclude those that are currently in sending state) */}
+                          {messages
+                            .filter(msg => {
+                              // Only show messages that are not duplicates of sending messages
+                              // A message is a duplicate if it has the same text and was created within last 5 seconds
+                              const isDuplicate = sendingMessages.some(sendingMsg => {
+                                const timeDiff = Math.abs(msg.createdAt.getTime() - sendingMsg.createdAt.getTime());
+                                return msg.message === sendingMsg.message && 
+                                       msg.senderId === sendingMsg.senderId &&
+                                       timeDiff < 5000; // Within 5 seconds
+                              });
+                              return !isDuplicate;
+                            })
+                            .map((msg, index) => (
+                              <MessageBubble
+                                key={msg.id}
+                                message={msg}
+                                isUser={msg.senderType === 'user'}
+                                brandLogo={selectedConversation.brandLogo}
+                                brandName={selectedConversation.brandName}
+                                brandId={selectedConversation.brandId}
+                                onServiceClick={handleServiceClick}
+                                onServiceView={handleServiceView}
+                                onExploreBrand={(brandId) => navigate('fog-service-brand', brandId)}
+                                index={index}
+                              />
+                            ))}
+                          {/* Render sending messages */}
+                          {sendingMessages.map((msg, index) => (
+                            <MessageBubble
+                              key={msg.id}
+                              message={msg}
+                              isUser={msg.senderType === 'user'}
+                              brandLogo={selectedConversation.brandLogo}
+                              brandName={selectedConversation.brandName}
+                              brandId={selectedConversation.brandId}
+                              onServiceClick={handleServiceClick}
+                              onServiceView={handleServiceView}
+                              onExploreBrand={(brandId) => navigate('fog-service-brand', brandId)}
+                              index={messages.length + index}
+                            />
+                          ))}
+                        </AnimatePresence>
+                        <div ref={messagesEndRef} />
+                      </>
+                    )}
+                  </div>
+
+                  {/* Message Input - Fixed at bottom */}
+                  <div className="flex-shrink-0 border-t border-[--color-border] p-4 bg-[--color-card]">
+                    <MessageInput
+                      value={messageText}
+                      onChange={setMessageText}
+                      onSend={handleSendMessage}
+                      placeholder="Type your message..."
+                      attachmentConfig={{
+                        allowImages: true,
+                        allowVideos: true,
+                        allowPDFs: true
+                      }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+                  <div className="text-8xl mb-4">💬</div>
+                  <h3 className="text-2xl font-semibold mb-2">Select a conversation</h3>
+                  <p className="text-[--color-text-secondary] max-w-md">
+                    Choose a conversation from the sidebar to start messaging with brands
+                  </p>
+                </div>
+              )}
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Message Bubble Component
+interface MessageBubbleProps {
+  message: ChatMessage;
+  isUser: boolean;
+  brandLogo?: string;
+  brandName: string;
+  brandId: string;
+  onServiceClick: (serviceId: string, serviceName: string) => void;
+  onServiceView: (serviceId: string) => void;
+  onExploreBrand: (brandId: string) => void;
+  index: number;
+}
+
+const MessageBubble = ({ message, isUser, brandLogo, brandName, brandId, onServiceClick, onServiceView, onExploreBrand, index }: MessageBubbleProps) => {
+  const hasAttachments = message.attachments && message.attachments.length > 0;
+  const hasMessage = message.message && message.message.trim().length > 0;
+  const hasServiceList = message.messageType === 'service-list' && message.serviceData?.services;
+  const hasInquiry = message.messageType === 'service-inquiry' && message.inquiryData;
+
+  const renderAttachments = () => {
+    if (!message.attachments || message.attachments.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        {message.attachments.map((attachment) => (
+          <div key={attachment.id}>
+            {attachment.type === 'image' && (
+              <div className="rounded-2xl overflow-hidden">
+                <img
+                  src={attachment.url}
+                  alt={attachment.name}
+                  className="max-w-[200px] md:max-w-[280px] lg:max-w-[300px] max-h-[200px] md:max-h-[280px] lg:max-h-[300px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => window.open(attachment.url, '_blank')}
+                />
+              </div>
+            )}
+            {attachment.type === 'video' && (
+              <div className="rounded-2xl overflow-hidden">
+                <video
+                  src={attachment.url}
+                  controls
+                  className="max-w-[200px] md:max-w-[280px] lg:max-w-[300px] max-h-[200px] md:max-h-[280px] lg:max-h-[300px]"
+                />
+              </div>
+            )}
+            {attachment.type === 'pdf' && (
+              <a
+                href={attachment.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center gap-2 p-2 md:p-3 rounded-2xl transition-colors ${
+                  isUser
+                    ? 'bg-[--color-primary] text-white hover:opacity-90'
+                    : 'bg-[--color-card] border border-[--color-border] hover:bg-[--color-bg-secondary]'
+                }`}
+              >
+                <FileText size={20} className={`md:w-6 md:h-6 ${isUser ? 'text-white' : 'text-red-500'}`} />
+                <div>
+                  <p className="font-medium text-xs md:text-sm">{attachment.name}</p>
+                  <p className={`text-[10px] md:text-xs ${isUser ? 'text-white/70' : 'text-[--color-text-secondary]'}`}>
+                    {(attachment.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, delay: index * 0.05 }}
+      className={`flex items-end gap-2 md:gap-3 ${isUser ? 'justify-end' : ''}`}
+    >
+      {!isUser && (
+        <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-[--color-bg-tertiary] flex-shrink-0 flex items-center justify-center text-xs md:text-sm font-bold overflow-hidden">
+          {brandLogo ? (
+            <img src={brandLogo} alt={brandName} className="w-full h-full object-cover" />
+          ) : (
+            brandName.split(' ').map(n => n[0]).join('').slice(0, 2)
+          )}
+        </div>
+      )}
+
+      <div className={`max-w-[85%] md:max-w-[75%] lg:max-w-[70%] ${isUser ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+        {/* Service Inquiry - Special card layout */}
+        {message.messageType === 'service-inquiry' && message.inquiryData && (
+          <ServiceInquiryMessage
+            serviceName={message.inquiryData.serviceName}
+            packageName={message.inquiryData.packageName}
+            price={message.inquiryData.price}
+            deliveryTime={message.inquiryData.deliveryTime}
+            hourlyRate={message.inquiryData.hourlyRate}
+            minimumHours={message.inquiryData.minimumHours}
+            isUser={isUser}
+          />
+        )}
+
+        {/* Attachments (images/videos) - No background */}
+        {hasAttachments && renderAttachments()}
+
+        {/* Message text and service list - With background */}
+        {(hasMessage || hasServiceList) && message.messageType !== 'service-inquiry' && (
+          <div
+            className={`p-2.5 md:p-3 rounded-2xl text-sm md:text-base ${
+              isUser
+                ? 'bg-[--color-primary] text-white rounded-br-lg'
+                : 'bg-[--color-card] border border-[--color-border] rounded-bl-lg'
+            }`}
+          >
+            {hasMessage && <p className="whitespace-pre-wrap break-words leading-relaxed">{message.message}</p>}
+            
+            {hasServiceList && (
+              <div className={hasMessage ? 'mt-2' : ''}>
+                <ServiceListMessage
+                  services={message.serviceData.services}
+                  brandId={message.serviceData.brandId}
+                  totalServices={message.serviceData.totalServices}
+                  onServiceClick={onServiceClick}
+                  onServiceView={onServiceView}
+                  onExploreBrand={onExploreBrand}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={`flex items-center gap-1 md:gap-1.5 ${isUser ? 'justify-end' : ''}`}>
+          {message.status === 'sending' && (
+            <Loader2 className="w-2.5 h-2.5 md:w-3 md:h-3 animate-spin text-[--color-text-secondary]" />
+          )}
+          <span className="text-[10px] md:text-xs text-[--color-text-secondary]">
+            {message.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+export default MessagesPage;

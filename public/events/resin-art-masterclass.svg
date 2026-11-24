@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="emeraldSea" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#05445e" />
+      <stop offset="40%" stop-color="#189ab4" />
+      <stop offset="80%" stop-color="#75e6da" />
+      <stop offset="100%" stop-color="#d4f1f4" />
+    </linearGradient>
+    <linearGradient id="goldVein" x1="0%" y1="0%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#bf953f" />
+      <stop offset="25%" stop-color="#fcf6ba" />
+      <stop offset="50%" stop-color="#b38728" />
+      <stop offset="75%" stop-color="#fbf5b7" />
+      <stop offset="100%" stop-color="#aa771c" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="360" fill="url(#emeraldSea)" />
+  <!-- Swirling fluid waves -->
+  <path d="M -50,160 Q 150,80 300,200 T 650,140 L 650,380 L -50,380 Z" fill="#05445e" opacity="0.65" />
+  <path d="M -50,220 Q 200,320 400,180 T 650,260" stroke="url(#goldVein)" stroke-width="8" fill="none" opacity="0.85" filter="drop-shadow(0 2px 5px rgba(0,0,0,0.3))" />
+  <path d="M 0,90 Q 250,50 420,130 T 650,70" stroke="url(#goldVein)" stroke-width="4" fill="none" opacity="0.75" />
+  <!-- Center Card -->
+  <rect x="100" y="80" width="400" height="200" rx="16" fill="rgba(255, 255, 255, 0.92)" stroke="url(#goldVein)" stroke-width="2" filter="drop-shadow(0 15px 30px rgba(0,0,0,0.25))" />
+  <text x="300" y="130" font-family="'Cinzel', serif" font-weight="700" font-size="13" fill="#8d6e3f" text-anchor="middle" letter-spacing="4">HANDS-ON 2-DAY WORKSHOP</text>
+  <text x="300" y="185" font-family="'Playfair Display', Georgia, serif" font-weight="900" font-size="34" fill="#05445e" text-anchor="middle">Resin Art</text>
+  <text x="300" y="235" font-family="'Inter', sans-serif" font-weight="800" font-size="20" fill="#189ab4" text-anchor="middle" letter-spacing="6">MASTERCLASS</text>
+</svg>

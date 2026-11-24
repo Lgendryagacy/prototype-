@@ -1,0 +1,45 @@
+<div className="max-w-7xl mx-auto">
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-7">
+    {visionaries.map((visionary, index) => (
+      <div
+        key={`${visionary.name}-${index}`}
+        className={`opacity-0 animate-fadeInUp`}
+        style={{ animationDelay: `${index * 150}ms` }}
+      >
+        <div className="bg-[--color-bg-marketplace] rounded-[15px] shadow-md hover:shadow-xl hover:-translate-y-2 transition-all duration-300 h-full border border-[--color-border]">
+          <div className="p-3 pb-2 pt-3 text-center flex flex-col h-full">
+            <VisionaryImage visionary={visionary} />
+            <h3 className="text-xl font-bold text-[--color-badge-text]">{visionary.name}</h3>
+            <p className="text-[--color-primary] font-semibold mt-">{visionary.role}</p>
+            <p className="text-sm text-[--color-text-marketplace] mt-2 flex-grow">
+              "{visionary.bio}"
+            </p>
+            <div className="flex justify-center gap-6 mt-6 mb-6">
+              <a
+                href={visionary.socials.twitter}
+                aria-label={`${visionary.name} on Twitter`}
+                className="text-[--color-text-secondary] hover:text-[--color-primary] transition-colors"
+              >
+                <Twitter className="w-6 h-6" />
+              </a>
+              <a
+                href={visionary.socials.phone}
+                aria-label={`Call ${visionary.name}`}
+                className="text-[--color-text-secondary] hover:text-[--color-primary] transition-colors"
+              >
+                <Phone className="w-6 h-6" />
+              </a>
+              <a
+                href={visionary.socials.instagram}
+                aria-label={`${visionary.name} on Instagram`}
+                className="text-[--color-text-secondary] hover:text-[--color-primary] transition-colors"
+              >
+                <Instagram className="w-6 h-6" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>

@@ -1,0 +1,387 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS - Security Validators
+    // ============================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return request.auth != null && 
+             (request.auth.token.email == 'crypticalmail@gmail.com' ||
+              (request.auth.token != null && request.auth.token.get('role', '') == 'admin') ||
+              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin'));
+    }
+    
+    // ============================================
+    // SYSTEM COLLECTIONS
+    // ============================================
+    
+    match /systemCounters/{document} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
+    }
+    
+    // ============================================
+    // USER MANAGEMENT
+    // ============================================
+    
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    match /userProfile/{userId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // FINANCIAL COLLECTIONS
+    // ============================================
+    
+    match /walletBalances/{userId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    match /userEarnings/{userId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    match /transactions/{transactionId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+
+    match /Transactions/{transactionId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    match /walletTransactions/{transactionId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    match /userWallets/{walletId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    match /walletTransfers/{transferId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    match /earningToWalletTransfers/{transferId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    match /withdrawalRequests/{requestId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    match /paymentRequests/{requestId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    match /bankAccounts/{accountId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    // ============================================
+    // JOB MANAGEMENT
+    // ============================================
+    
+    match /JobRequests/{requestId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+
+    match /jobRequests/{requestId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+
+    match /PhysicalJobRequests/{requestId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /FogslyJobs/{jobId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+
+    match /FogslyPhysicalJobs/{jobId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /jobCompletionRequests/{requestId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /JobsProposal/{proposalId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+
+    match /JobProposal/{proposalId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /SavedJobs/{savedJobId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+
+    match /physicalJobApplications/{appId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /workDeliveries/{deliveryId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    // ============================================
+    // BRAND & SERVICE MANAGEMENT
+    // ============================================
+    
+    match /brandRequests/{requestId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /brands/{brandId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /BrandsServices/{serviceId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+
+    match /BrandServices/{serviceId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    // ============================================
+    // FREELANCER MANAGEMENT
+    // ============================================
+    
+    match /FreelanceRequests/{requestId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /ApprovedFreelancers/{freelancerId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || isAdmin() || true;
+    }
+    
+    // ============================================
+    // MESSAGING & COMMUNICATION (P2P, Public, Brand)
+    // ============================================
+    
+    match /conversations/{conversationId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+    
+    match /messages/{messageId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+
+    match /PublicChat/{conversationId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+    
+    match /jobConversations/{conversationId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+    
+    match /jobMessages/{messageId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+
+    // ========================================
+    // ADS & ENGAGEMENT COLLECTIONS
+    // ========================================
+    
+    match /ads/{adId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() || isAuthenticated() || true;
+    }
+    
+    match /userAdInteractions/{interactionId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /userAdStats/{userId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /userDailyActivities/{activityId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+
+    // ========================================
+    // EVENTS & GIVEAWAYS MANAGEMENT
+    // ========================================
+    
+    match /EventRequests/{requestId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /ActiveEvents/{eventId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || isAdmin() || true;
+    }
+    
+    match /eventAttendees/{attendeeId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+
+    match /Giveaways/{giveawayId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || isAdmin() || true;
+    }
+
+    match /ActiveGiveaways/{giveawayId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || isAdmin() || true;
+    }
+
+    match /giveawayParticipants/{participantId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    // ========================================
+    // SETTINGS & CONFIGURATION
+    // ========================================
+    
+    match /fogCoinSettings/{settingId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || isAdmin() || true;
+    }
+    
+    match /fogCoinSettingsHistory/{historyId} {
+      allow read, write: if true;
+    }
+    
+    match /customThemes/{themeId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ========================================
+    // ADMIN & SYSTEM
+    // ========================================
+    
+    match /adminUsers/{adminId} {
+      allow read, write: if true;
+    }
+    
+    match /admins/{adminId} {
+      allow read, write: if true;
+    }
+    
+    match /publicData/{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ========================================
+    // REFERRALS & SURVEYS
+    // ========================================
+    
+    match /referrals/{referralId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+    
+    match /FogslySurvey/{surveyId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || true;
+    }
+
+    // ========================================
+    // RANKINGS & STATISTICS
+    // ========================================
+    
+    match /userRankings/{userId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAdmin();
+    }
+    
+    match /withdrawalStats/{statId} {
+      allow read, write: if true;
+    }
+
+    // ========================================
+    // DEFAULT DENY RULE
+    // ============================================
+    
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
